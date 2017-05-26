@@ -2,7 +2,6 @@ package fi.nls.oskari.map.layer;
 
 import fi.nls.oskari.domain.map.OskariLayer;
 import fi.nls.oskari.service.OskariComponent;
-import fi.nls.oskari.service.db.BaseService;
 
 import java.util.List;
 
