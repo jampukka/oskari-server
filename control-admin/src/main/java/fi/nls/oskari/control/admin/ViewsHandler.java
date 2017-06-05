@@ -11,10 +11,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import fi.nls.oskari.annotation.OskariActionRoute;
-import fi.nls.oskari.control.ActionDeniedException;
 import fi.nls.oskari.control.ActionException;
 import fi.nls.oskari.control.ActionParameters;
-import fi.nls.oskari.control.RestActionHandler;
 import fi.nls.oskari.domain.map.view.View;
 import fi.nls.oskari.log.LogFactory;
 import fi.nls.oskari.log.Logger;
@@ -28,7 +26,7 @@ import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.util.ResponseHelper;
 
 @OskariActionRoute("Views")
-public class ViewsHandler extends RestActionHandler {
+public class ViewsHandler extends AdminOnlyRestActionHandler {
 
     private static final Logger LOG = LogFactory.getLogger(ViewsHandler.class);
 
@@ -42,13 +40,6 @@ public class ViewsHandler extends RestActionHandler {
     public ViewsHandler(BundleService bundleService, ViewService viewService) {
         this.bundleService = bundleService;
         this.viewService = viewService;
-    }
-
-    @Override
-    public void preProcess(ActionParameters params) throws ActionDeniedException {
-        if (!params.getUser().isAdmin()) {
-            throw new ActionDeniedException("Admin only");
-        }
     }
 
     @Override
