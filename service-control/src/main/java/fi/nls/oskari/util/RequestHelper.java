@@ -2,11 +2,15 @@ package fi.nls.oskari.util;
 
 import fi.nls.oskari.log.LogFactory;
 import fi.nls.oskari.log.Logger;
+
 import org.apache.commons.lang.StringEscapeUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Whitelist;
 
 import javax.servlet.http.HttpServletRequest;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -127,4 +131,19 @@ public class RequestHelper {
         }
         return result;
     }
+
+    /**
+     * Reads the message body of the HttpServletRequest fully
+     * @param req the request in question
+     * @return byte array containing the body, null if IOException occurred
+     */
+    public static byte[] readRequestBody(HttpServletRequest req) {
+        try (InputStream in = req.getInputStream()) {
+            return IOHelper.readBytes(in);
+        } catch (IOException e) {
+            log.warn(e);
+            return null;
+        }
+    }
+
 }
