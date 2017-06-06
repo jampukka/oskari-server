@@ -3,6 +3,7 @@ package fi.nls.oskari.map.layer;
 import com.ibatis.common.resources.Resources;
 import com.ibatis.sqlmap.client.SqlMapClient;
 import com.ibatis.sqlmap.client.SqlMapClientBuilder;
+
 import fi.mml.map.mapwindow.service.db.InspireThemeService;
 import fi.mml.map.mapwindow.service.db.InspireThemeServiceIbatisImpl;
 import fi.mml.map.mapwindow.util.OskariLayerWorker;
@@ -364,6 +365,35 @@ public class OskariLayerServiceIbatisImpl extends OskariLayerService {
             return id;
         } catch (Exception e) {
             throw new RuntimeException("Failed to insert", e);
+        } finally {
+            if (client != null) {
+                try {
+                    client.endTransaction();
+                } catch (SQLException ignored) { }
+            }
+        }
+    }
+
+    @Override
+    public int[] insertAll(final List<OskariLayer> layers) {
+        SqlMapClient client = getSqlMapClient();
+        try {
+            client.startTransaction();
+            int[] ids = new int[layers.size()];
+            String queryId = getNameSpace() + ".insert";
+            for (int i = 0; i < layers.size(); i++) {
+                OskariLayer layer = layers.get(i);
+                Integer id = (Integer) client.insert(queryId, layer);
+                ids[i] = id;
+                layer.setId(id);
+                // link to inspire theme(s)
+                inspireThemeService.updateLayerThemes(id, layer.getInspireThemes());
+            }
+            client.commitTransaction();
+            return ids;
+        } catch (SQLException e) {
+            LOG.warn(e, "Failed to insert Layers!");
+            return null;
         } finally {
             if (client != null) {
                 try {

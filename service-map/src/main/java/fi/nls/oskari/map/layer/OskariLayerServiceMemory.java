@@ -100,6 +100,20 @@ public class OskariLayerServiceMemory extends OskariLayerService {
     }
 
     @Override
+    public int[] insertAll(List<OskariLayer> layers) {
+        int id = list.size();
+        int[] ids = new int[layers.size()];
+        for (int i = 0; i < layers.size(); i++) {
+            OskariLayer layer = layers.get(i);
+            layer.setId(id);
+            ids[i] = id;
+            list.add(layer);
+            id++;
+        }
+        return ids;
+    }
+
+    @Override
     public void update(OskariLayer layer) {
         int id = layer.getId();
         if (id < 0) {

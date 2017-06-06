@@ -529,8 +529,7 @@
         ]]>
     </statement>
 
-    <statement id="insert" parameterMap="LayerInsertParameter" >
-        <!--  resultClass="java.lang.Integer" -->
+    <statement id="insert" parameterMap="LayerInsertParameter" resultClass="java.lang.Integer">
         insert into oskari_maplayer (
             parentId,
             type,
@@ -571,6 +570,7 @@
             created,
             updated)
         values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        RETURNING id
     </statement>
 
     <statement id="update" parameterMap="LayerUpdateParameter">
