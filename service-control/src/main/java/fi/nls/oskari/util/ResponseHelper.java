@@ -43,21 +43,41 @@ public class ResponseHelper {
 
     /**
      * Writes out the given response as JSON
-     *
      * @param params reference to ActionParams
      * @param sc HTTP Status Code to send
-     * @param json JSONObject to send
+     * @param jsonObj JSONObject to send
      */
-    public static final void writeResponse(ActionParameters params, int sc, JSONObject json) {
-        final byte[] b = json.toString().getBytes(StandardCharsets.UTF_8);
-        final int len = b.length;
+    public static final void writeResponse(ActionParameters params, int sc, JSONObject jsonObj) {
+        byte[] b = jsonObj.toString().getBytes(StandardCharsets.UTF_8);
+        writeResponse(params, sc, CONTENT_TYPE_JSON_UTF8, b);
+    }
 
+    /**
+     * Writes out the given JSON Array to the response
+     * @param params reference to ActionParams
+     * @param sc HTTP Status Code to send
+     * @param jsonArr JSONObject to send
+     */
+    public static final void writeResponse(ActionParameters params, int sc, JSONArray jsonArr) {
+        byte[] b = jsonArr.toString().getBytes(StandardCharsets.UTF_8);
+        writeResponse(params, sc, CONTENT_TYPE_JSON_UTF8, b);
+    }
+
+    /**
+     * Writes out the response
+     * @param params reference to ActionParams
+     * @param sc HTTP Status Code to send
+     * @param contentType Content-type to send
+     * @param b data to send
+     */
+    public static final void writeResponse(ActionParameters params, int sc,
+            String contentType, byte[] b) {
         final HttpServletResponse resp = params.getResponse();
         resp.setStatus(sc);
-        resp.setContentType(CONTENT_TYPE_JSON_UTF8);
-        resp.setContentLength(len);
+        resp.setContentType(contentType);
+        resp.setContentLength(b.length);
         try (OutputStream out = resp.getOutputStream()) {
-            out.write(b, 0, len);
+            out.write(b, 0, b.length);
         } catch (IOException e) {
             LOG.warn(e);
         }

@@ -1,10 +1,14 @@
 package fi.nls.oskari.control.admin;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -16,6 +20,7 @@ import fi.nls.oskari.log.LogFactory;
 import fi.nls.oskari.log.Logger;
 import fi.nls.oskari.map.layer.OskariLayerService;
 import fi.nls.oskari.map.layer.OskariLayerServiceIbatisImpl;
+import fi.nls.oskari.map.layer.formatters.LayerJSONFormatter;
 import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.util.RequestHelper;
 import fi.nls.oskari.util.ResponseHelper;
@@ -24,6 +29,7 @@ import fi.nls.oskari.util.ResponseHelper;
 public class LayersHandler extends AdminOnlyRestActionHandler {
 
     private static final Logger LOG = LogFactory.getLogger(LayersHandler.class);
+    private static final LayerJSONFormatter FORMATTER = new LayerJSONFormatter();
 
     private final OskariLayerService service;
 
@@ -37,20 +43,12 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
 
     @Override
     public void handleGet(ActionParameters params) throws ActionException {
-        String id = params.getRequiredParam("id");
-        OskariLayer layer = service.find(id);
-        if (layer == null) {
-            LOG.info("Could not find layer with id: ", id);
-            throw new ActionException("Layer not found!");
+        List<OskariLayer> layers = getLayers(params.getHttpParam("id"));
+        JSONArray array = new JSONArray();
+        for (OskariLayer layer : layers) {
+            array.put(toJSON(layer));
         }
-
-        try {
-            JSONObject json = toJSON(layer);
-            ResponseHelper.writeResponse(params, HttpServletResponse.SC_OK, json);
-        } catch (JSONException e) {
-            LOG.warn(e);
-            throw new ActionException("Failed to create JSON from Layer!");
-        }
+        ResponseHelper.writeResponse(params, HttpServletResponse.SC_OK, array);
     }
 
     @Override
@@ -66,49 +64,92 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
             throw new ActionException("Failed to read request!");
         }
 
-        final OskariLayer layer = parseLayer(body);
-        if (layer == null) {
-            throw new ActionException("Failed to parse Layer from request!");
-        }
-
-        int id = service.insert(layer);
-        if (id == -1 || id != layer.getId()) {
-            throw new ActionException("Failed to insert Layer!");
-        }
+        final List<OskariLayer> layers = parseLayers(body);
+        insertLayers(layers);
 
         try {
-            JSONObject json = createResponse(layer);
-            ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, json);
+            JSONArray response = createResponse(layers);
+            ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, response);
         } catch (JSONException e) {
             LOG.warn(e);
             throw new ActionException("Failed to create response JSON");
         }
     }
 
-    protected OskariLayer parseLayer(byte[] body) {
-        try {
-            String jsonString = new String(body, StandardCharsets.UTF_8);
-            JSONObject layerJSON = new JSONObject(jsonString);
-            return fromJSON(layerJSON);
-        } catch (JSONException e) {
-            LOG.warn(e);
-            return null;
+    private void insertLayers(List<OskariLayer> layers) throws ActionException {
+        int[] ids = service.insertAll(layers);
+        if (!checkIdsMatch(ids, layers)) {
+            throw new ActionException("Failed to insert layers!");
         }
     }
 
-    public static JSONObject toJSON(OskariLayer layer) throws JSONException {
-        return null;
+    private boolean checkIdsMatch(int[] ids, List<OskariLayer> layers) {
+        if (ids == null) {
+            return false;
+        }
+        for (int i = 0; i < ids.length; i++) {
+            if (ids[i] != layers.get(i).getId()) {
+                return false;
+            }
+        }
+        return true;
     }
 
-    public static OskariLayer fromJSON(JSONObject layerJSON) throws JSONException, IllegalArgumentException {
-        return null;
+    protected List<OskariLayer> getLayers(String id) {
+        if (id == null || id.length() == 0) {
+            // &id= missing or empty => return all
+            return service.findAll();
+        } else if (id.indexOf(',') >= 0) {
+            // Comma separated list of ids
+            return service.find(Arrays.asList(id.split(",")), null);
+        } else {
+            // Single id
+            List<OskariLayer> layers = new ArrayList<>(1);
+            OskariLayer layer = service.find(id);
+            if (layer != null) {
+                layers.add(layer);
+            }
+            return layers;
+        }
     }
 
-    private static JSONObject createResponse(OskariLayer layer) throws JSONException {
-        JSONObject json = new JSONObject();
-        json.put("id", layer.getId());
-        json.put("url", layer.getUrl());
-        return json;
+    protected List<OskariLayer> parseLayers(byte[] body) throws ActionException {
+        try {
+            List<OskariLayer> layers = new ArrayList<>();
+            String jsonString = new String(body, StandardCharsets.UTF_8);
+            JSONArray array = new JSONArray(jsonString);
+            for (int i = 0; i < array.length(); i++) {
+                Object obj = array.get(i);
+                if (obj instanceof JSONObject) {
+                    layers.add(FORMATTER.parseLayer((JSONObject) obj));
+                } else {
+                    throw new ActionException("Invalid input! Array item " + i + " not an object!");
+                }
+            }
+            return layers;
+        } catch (JSONException e) {
+            LOG.warn(e);
+            throw new ActionException("Invalid input! " + e.getMessage());
+        }
+    }
+
+    public static JSONObject toJSON(OskariLayer layer) throws ActionException {
+        return FORMATTER.getJSON(layer, layer.getLanguages().get(0), false);
+    }
+
+    public static OskariLayer fromJSON(JSONObject layerJSON) throws ActionException, JSONException {
+        return FORMATTER.parseLayer(layerJSON);
+    }
+
+    private static JSONArray createResponse(List<OskariLayer> layers) throws JSONException {
+        JSONArray array = new JSONArray();
+        for (OskariLayer layer : layers) {
+            JSONObject json = new JSONObject();
+            json.put("id", layer.getId());
+            json.put("url", layer.getUrl());
+            array.put(json);
+        }
+        return array;
     }
 
 }
