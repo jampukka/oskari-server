@@ -49,7 +49,7 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
             ResponseHelper.writeResponse(params, HttpServletResponse.SC_OK, json);
         } catch (JSONException e) {
             LOG.warn(e);
-            ResponseHelper.writeError(params, "Server error!");
+            throw new ActionException("Failed to create JSON from Layer!");
         }
     }
 
@@ -81,7 +81,7 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
             ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, json);
         } catch (JSONException e) {
             LOG.warn(e);
-            ResponseHelper.writeError(params, "Server error!");
+            throw new ActionException("Failed to create response JSON");
         }
     }
 
