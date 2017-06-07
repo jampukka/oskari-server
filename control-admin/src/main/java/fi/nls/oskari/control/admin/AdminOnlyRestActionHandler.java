@@ -8,9 +8,7 @@ public abstract class AdminOnlyRestActionHandler extends RestActionHandler {
 
     @Override
     public void preProcess(ActionParameters params) throws ActionDeniedException {
-        if (!params.getUser().isAdmin()) {
-            throw new ActionDeniedException("Admin only");
-        }
+        params.requireAdminUser();
     }
 
 }
