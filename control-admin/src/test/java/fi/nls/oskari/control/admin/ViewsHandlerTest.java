@@ -18,6 +18,7 @@ import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 
+import fi.nls.oskari.control.ActionDeniedException;
 import fi.nls.oskari.control.ActionException;
 import fi.nls.oskari.control.ActionParameters;
 import fi.nls.oskari.domain.map.view.View;
@@ -43,7 +44,7 @@ public class ViewsHandlerTest extends JSONActionRouteTest {
     }
 
     @Test
-    public void whenUserIsGuestThrowsException() {
+    public void whenUserIsGuestThrowsException() throws ActionException {
         ActionParameters params = new ActionParameters();
         params.setRequest(mockHttpServletRequest());
         params.setResponse(mockHttpServletResponse());
@@ -52,13 +53,13 @@ public class ViewsHandlerTest extends JSONActionRouteTest {
         try {
             views.handleAction(params);
             fail("ActionDeniedException should have been thrown");
-        } catch (ActionException e) {
-            assertEquals("Admin only", e.getMessage());
+        } catch (ActionDeniedException e) {
+            assertEquals("Session expired", e.getMessage());
         }
     }
 
     @Test
-    public void whenUserIsNotAdminThrowsActionException() {
+    public void whenUserIsNotAdminThrowsActionException() throws ActionException {
         ActionParameters params = new ActionParameters();
         params.setRequest(mockHttpServletRequest());
         params.setResponse(mockHttpServletResponse());
@@ -67,7 +68,7 @@ public class ViewsHandlerTest extends JSONActionRouteTest {
         try {
             views.handleAction(params);
             fail("ActionDeniedException should have been thrown");
-        } catch (ActionException e) {
+        } catch (ActionDeniedException e) {
             assertEquals("Admin only", e.getMessage());
         }
     }
