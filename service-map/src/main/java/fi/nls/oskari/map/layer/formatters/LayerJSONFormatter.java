@@ -12,6 +12,7 @@ import fi.nls.oskari.map.layer.LayerGroupServiceIbatisImpl;
 import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.util.JSONHelper;
 import fi.nls.oskari.util.PropertyUtil;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -19,6 +20,7 @@ import org.json.JSONObject;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * Created with IntelliJ IDEA.
@@ -236,7 +238,59 @@ public class LayerJSONFormatter {
     }
 
     /**
+     * Minimal implementation for converting OskariLayer to JSON
+     * @see #parseLayer(final JSONObject json)
+     * @param json
+     * @return
+     */
+    public JSONObject serializeLayer(final OskariLayer layer) throws JSONException {
+        final JSONObject json = new JSONObject();
+
+        json.put("type", layer.getType());
+        json.put("url", layer.getUrl());
+        json.put("locale", layer.getLocale());
+
+        if (layer.getGroup() != null) {
+            String name = getRandomValue(layer.getGroup().getNames());
+            json.put("organization", name != null ? name : "");
+        }
+
+        if (layer.getInspireTheme() != null) {
+            String name = getRandomValue(layer.getInspireTheme().getNames());
+            json.put("inspiretheme", name != null ? name : "");
+        }
+
+        json.put("base_map", layer.isBaseMap());
+        json.put("opacity", layer.getOpacity());
+        json.put("style", layer.getStyle());
+        json.put("minscale", layer.getMinScale());
+        json.put("maxscale", layer.getMaxScale());
+        json.put("legend_image", layer.getLegendImage());
+        json.put("metadataid", layer.getMetadataId());
+        json.put("tile_matrix_set_id", layer.getTileMatrixSetId());
+        json.put("gfi_type", layer.getGfiType());
+        json.put("gfi_xslt", layer.getGfiXslt());
+        json.put("gfi_content", layer.getGfiContent());
+        json.put("geometry", layer.getGeometry());
+        json.put("realtime", layer.getRealtime());
+        json.put("refresh_rate", layer.getRefreshRate());
+        json.put("srs_name", layer.getSrs_name());
+        json.put("version", layer.getVersion());
+
+        if (layer.getParams() != null) {
+            json.put("params", layer.getParams());
+        }
+
+        if (layer.getOptions() != null) {
+            json.put("options", layer.getOptions());
+        }
+
+        return json;
+    }
+
+    /**
      * Minimal implementation for parsing layer in json format.
+     * @see #serializeLayer(final OskariLayer layer)
      * @param json
      * @return
      */
@@ -300,4 +354,20 @@ public class LayerJSONFormatter {
 
         return layer;
     }
+
+    /**
+     * Get the first value of a map
+     * The value returned depends on the implementation of the map
+     * @param map
+     * @return one value, null if map is null or if it contains no values
+     */
+    private static <K,V> V getRandomValue(Map<K, V> map) {
+        if (map != null) {
+            try {
+                return map.values().iterator().next();
+            } catch (NoSuchElementException ignore) {}
+        }
+        return null;
+    }
+
 }

@@ -44,11 +44,8 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
     @Override
     public void handleGet(ActionParameters params) throws ActionException {
         List<OskariLayer> layers = getLayers(params.getHttpParam("id"));
-        JSONArray array = new JSONArray();
-        for (OskariLayer layer : layers) {
-            array.put(toJSON(layer));
-        }
-        ResponseHelper.writeResponse(params, HttpServletResponse.SC_OK, array);
+        JSONArray response = serializeLayers(layers);
+        ResponseHelper.writeResponse(params, HttpServletResponse.SC_OK, response);
     }
 
     @Override
@@ -67,13 +64,8 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
         final List<OskariLayer> layers = parseLayers(body);
         insertLayers(layers);
 
-        try {
-            JSONArray response = createResponse(layers);
-            ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, response);
-        } catch (JSONException e) {
-            LOG.warn(e);
-            throw new ActionException("Failed to create response JSON");
-        }
+        JSONArray response = createResponse(layers);
+        ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, response);
     }
 
     private void insertLayers(List<OskariLayer> layers) throws ActionException {
@@ -100,6 +92,19 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
         }
     }
 
+    protected JSONArray serializeLayers(List<OskariLayer> layers) throws ActionException {
+        try {
+            JSONArray array = new JSONArray();
+            for (OskariLayer layer : layers) {
+                array.put(FORMATTER.serializeLayer(layer));
+            }
+            return array;
+        } catch (JSONException e) {
+            LOG.warn(e);
+            throw new ActionException("Failed to write layers as JSON!");
+        }
+    }
+
     protected List<OskariLayer> parseLayers(byte[] body) throws ActionException {
         try {
             List<OskariLayer> layers = new ArrayList<>();
@@ -120,23 +125,20 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
         }
     }
 
-    public static JSONObject toJSON(OskariLayer layer) throws ActionException {
-        return FORMATTER.getJSON(layer, layer.getLanguages().get(0), false);
-    }
-
-    public static OskariLayer fromJSON(JSONObject layerJSON) throws ActionException, JSONException {
-        return FORMATTER.parseLayer(layerJSON);
-    }
-
-    private static JSONArray createResponse(List<OskariLayer> layers) throws JSONException {
-        JSONArray array = new JSONArray();
-        for (OskariLayer layer : layers) {
-            JSONObject json = new JSONObject();
-            json.put("id", layer.getId());
-            json.put("url", layer.getUrl());
-            array.put(json);
+    protected JSONArray createResponse(List<OskariLayer> layers) throws ActionException {
+        try {
+            JSONArray array = new JSONArray();
+            for (OskariLayer layer : layers) {
+                JSONObject json = new JSONObject();
+                json.put("id", layer.getId());
+                json.put("url", layer.getUrl());
+                array.put(json);
+            }
+            return array;
+        } catch (JSONException e) {
+            LOG.warn(e);
+            throw new ActionException("Failed to create response JSON!");
         }
-        return array;
     }
 
 }
