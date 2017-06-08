@@ -15,7 +15,7 @@ public abstract class OskariLayerService extends OskariComponent {
     public abstract List<OskariLayer> findByUrlAndName(final String url, final String name);
     public abstract List<OskariLayer> findByMetadataId(String uuid);
     public abstract int insert(final OskariLayer layer);
-    public abstract int[] insertAll(final List<OskariLayer> layers);
+    public abstract int insertAll(final List<OskariLayer> layers);
     public abstract void update(final OskariLayer layer);
     public abstract void delete(final int layerId);
 }

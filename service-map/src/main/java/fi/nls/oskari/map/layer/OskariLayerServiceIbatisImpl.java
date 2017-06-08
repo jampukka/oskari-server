@@ -375,25 +375,28 @@ public class OskariLayerServiceIbatisImpl extends OskariLayerService {
     }
 
     @Override
-    public int[] insertAll(final List<OskariLayer> layers) {
+    public int insertAll(final List<OskariLayer> layers) {
         SqlMapClient client = getSqlMapClient();
         try {
             client.startTransaction();
-            int[] ids = new int[layers.size()];
             String queryId = getNameSpace() + ".insert";
-            for (int i = 0; i < layers.size(); i++) {
-                OskariLayer layer = layers.get(i);
-                Integer id = (Integer) client.insert(queryId, layer);
-                ids[i] = id;
-                layer.setId(id);
-                // link to inspire theme(s)
-                inspireThemeService.updateLayerThemes(id, layer.getInspireThemes());
+            int n = 0;
+            for (OskariLayer layer : layers) {
+                if (layer != null) {
+                    Integer id = (Integer) client.insert(queryId, layer);
+                    if (id != null && id >= 0) {
+                        layer.setId(id);
+                        n++;
+                        // link to inspire theme(s)
+                        inspireThemeService.updateLayerThemes(id, layer.getInspireThemes());
+                    }
+                }
             }
             client.commitTransaction();
-            return ids;
+            return n;
         } catch (SQLException e) {
             LOG.warn(e, "Failed to insert Layers!");
-            return null;
+            return -1;
         } finally {
             if (client != null) {
                 try {

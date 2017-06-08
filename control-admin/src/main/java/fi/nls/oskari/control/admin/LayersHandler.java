@@ -77,22 +77,9 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
     }
 
     private void insertLayers(List<OskariLayer> layers) throws ActionException {
-        int[] ids = service.insertAll(layers);
-        if (!checkIdsMatch(ids, layers)) {
+        if (service.insertAll(layers) == -1) {
             throw new ActionException("Failed to insert layers!");
         }
-    }
-
-    private boolean checkIdsMatch(int[] ids, List<OskariLayer> layers) {
-        if (ids == null) {
-            return false;
-        }
-        for (int i = 0; i < ids.length; i++) {
-            if (ids[i] != layers.get(i).getId()) {
-                return false;
-            }
-        }
-        return true;
     }
 
     protected List<OskariLayer> getLayers(String id) {

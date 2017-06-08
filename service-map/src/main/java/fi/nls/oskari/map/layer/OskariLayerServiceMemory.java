@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import fi.nls.oskari.domain.map.OskariLayer;
 import fi.nls.oskari.util.ConversionHelper;
@@ -14,6 +15,7 @@ import fi.nls.oskari.util.ConversionHelper;
 public class OskariLayerServiceMemory extends OskariLayerService {
 
     private final List<OskariLayer> list = new ArrayList<>();
+    private final AtomicInteger idSerial = new AtomicInteger(1);
 
     @Override
     public OskariLayer find(int id) {
@@ -93,24 +95,24 @@ public class OskariLayerServiceMemory extends OskariLayerService {
 
     @Override
     public int insert(OskariLayer layer) {
-        int id = list.size();
-        list.add(layer);
-        layer.setId(id);
-        return id;
+        if (layer != null) {
+            final int id = idSerial.getAndDecrement();
+            layer.setId(id);
+            list.add(layer);
+            return id;
+        }
+        return -1;
     }
 
     @Override
-    public int[] insertAll(List<OskariLayer> layers) {
-        int id = list.size();
-        int[] ids = new int[layers.size()];
-        for (int i = 0; i < layers.size(); i++) {
-            OskariLayer layer = layers.get(i);
-            layer.setId(id);
-            ids[i] = id;
-            list.add(layer);
-            id++;
+    public int insertAll(List<OskariLayer> layers) {
+        int n = 0;
+        for (OskariLayer layer : layers) {
+            if (insert(layer) >= 0) {
+                n++;
+            }
         }
-        return ids;
+        return n;
     }
 
     @Override
