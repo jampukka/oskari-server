@@ -118,7 +118,7 @@
         </dependency>
         <dependency>
             <groupId>fi.nls.oskari.service</groupId>
-            <artifactId>oskari-users</artifactId>
+            <artifactId>oskari-control-users</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

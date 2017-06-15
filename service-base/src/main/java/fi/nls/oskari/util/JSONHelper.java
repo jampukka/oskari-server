@@ -1,14 +1,21 @@
 package fi.nls.oskari.util;
 
-import fi.nls.oskari.log.LogFactory;
-import fi.nls.oskari.log.Logger;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import java.util.*;
+import fi.nls.oskari.log.LogFactory;
+import fi.nls.oskari.log.Logger;
 
 
 public class JSONHelper {
@@ -127,30 +134,6 @@ public class JSONHelper {
             }
         }
         return map;
-    }
-
-    /**
-     * Get all JSONObjects inside an array
-     * @param jsonArr in question
-     * @return JSONObjects inside an array, other elements are ignored
-     */
-    public static List<JSONObject> getJSONObjects(final JSONArray jsonArr) {
-        if (jsonArr == null) {
-            return new ArrayList<JSONObject>(0);
-        }
-
-        List<JSONObject> jsonObjects = new ArrayList<>();
-        for (int i = 0; i < jsonArr.length(); i++) {
-            try {
-                Object obj = jsonArr.get(i);
-                if (obj != null && obj instanceof JSONObject) {
-                    jsonObjects.add((JSONObject) obj);
-                }
-            } catch (JSONException ignore) {
-                // JSONArray#get(i) throws Exceptions if out of bounds
-            }
-        }
-        return jsonObjects;
     }
 
     public static final <T> List<T> getArrayAsList(final JSONArray array) {
@@ -484,5 +467,24 @@ public class JSONHelper {
             log.warn(ex, "Error merging objects from:", overrides, "- to:", baseData);
         }
         return result;
+    }
+
+    /**
+     * Safely extract all the keys as a List of Strings
+     * @param json JSONObject whose keys you want
+     * @return the keys, never null, empty list if none can be found
+     */
+    public static List<String> getKeys(JSONObject json) {
+        final List<String> keys = new ArrayList<>();
+        if (json != null) {
+            final Iterator iter = json.keys();
+            while (iter.hasNext()) {
+                final Object obj = iter.next();
+                if (obj != null && obj instanceof String) {
+                    keys.add((String) obj);
+                }
+            }
+        }
+        return keys;
     }
 }

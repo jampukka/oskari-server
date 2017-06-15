@@ -12,8 +12,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.oskari.common.ServiceFactory;
+import org.oskari.control.users.RoleHelper;
 
 import fi.mml.map.mapwindow.service.db.InspireThemeService;
+import fi.mml.portti.service.db.permissions.PermissionsService;
 import fi.nls.oskari.annotation.OskariActionRoute;
 import fi.nls.oskari.control.ActionException;
 import fi.nls.oskari.control.ActionParameters;
@@ -23,6 +25,9 @@ import fi.nls.oskari.log.Logger;
 import fi.nls.oskari.map.layer.LayerGroupService;
 import fi.nls.oskari.map.layer.LayerImportExport;
 import fi.nls.oskari.map.layer.OskariLayerService;
+import fi.nls.oskari.permission.domain.Permission;
+import fi.nls.oskari.permission.domain.Resource;
+import fi.nls.oskari.user.IbatisRoleService;
 import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.util.JSONHelper;
 import fi.nls.oskari.util.RequestHelper;
@@ -36,19 +41,27 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
     private final OskariLayerService layerService;
     private final InspireThemeService inspireThemeService;
     private final LayerGroupService layerGroupService;
+    private final PermissionsService permissionsService;
+    private final IbatisRoleService roleService;
 
     public LayersHandler() {
         this(ServiceFactory.getMapLayerService(),
                 ServiceFactory.getInspireThemeService(),
-                ServiceFactory.getLayerGroupService());
+                ServiceFactory.getLayerGroupService(),
+                ServiceFactory.getPermissionsService(),
+                new IbatisRoleService());
     }
 
     public LayersHandler(OskariLayerService layerService,
             InspireThemeService inspireThemeService,
-            LayerGroupService layerGroupService) {
+            LayerGroupService layerGroupService,
+            PermissionsService permissionsService,
+            IbatisRoleService roleService) {
         this.layerService = layerService;
         this.inspireThemeService = inspireThemeService;
         this.layerGroupService = layerGroupService;
+        this.permissionsService = permissionsService;
+        this.roleService = roleService;
     }
 
     @Override
@@ -60,22 +73,29 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
 
     @Override
     public void handlePost(ActionParameters params) throws ActionException {
-        HttpServletRequest req = params.getRequest();
-        String contentType = req.getContentType();
+        final HttpServletRequest req = params.getRequest();
+        final String contentType = req.getContentType();
         if (contentType == null || !contentType.startsWith(IOHelper.CONTENT_TYPE_JSON)) {
             throw new ActionException("Expected JSON input!");
         }
 
-        byte[] body = RequestHelper.readRequestBody(req);
-        List<JSONObject> layerJSONs = parseJSONObjects(body);
-        List<OskariLayer> layers = deserialize(layerJSONs);
-        int count = layerService.insertAll(layers);
-        if (count == -1) {
+        final byte[] body = RequestHelper.readRequestBody(req);
+        final List<JSONObject> layerJSONs = parseJSONObjects(body);
+        final List<OskariLayer> layers = deserialize(layerJSONs);
+        insertLayers(layers);
+        addPermissions(layers, layerJSONs);
+
+        final JSONArray response = createResponse(layers);
+        ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, response);
+    }
+
+
+
+    private void insertLayers(List<OskariLayer> layers) throws ActionException {
+        final int count = layerService.insertAll(layers);
+        if (count == -1 || count != layers.size()) {
             throw new ActionException("Failed to insert layers!");
         }
-
-        JSONArray response = createResponse(layers);
-        ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, response);
     }
 
     protected List<OskariLayer> findLayers(String id) {
@@ -101,12 +121,13 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
             throw new ActionException("Missing input!");
         }
         String jsonString = new String(jsonBytes, StandardCharsets.UTF_8);
+        JSONArray jsonArr;
         try {
-            JSONArray jsonArr = new JSONArray(jsonString);
-            return JSONHelper.getJSONObjects(jsonArr);
+            jsonArr = new JSONArray(jsonString);
         } catch (JSONException e) {
-            throw new ActionException("Invalid input! Expected JSON Array of JSON Objects!");
+            throw new ActionException("Invalid input! Expected JSON Array!");
         }
+        return JSONHelper.getArrayAsList(jsonArr);
     }
 
     protected JSONArray serialize(List<OskariLayer> layers) throws ActionException {
@@ -131,9 +152,9 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
             List<OskariLayer> layers = new ArrayList<>();
             for (JSONObject layerJSON : layerJSONs) {
                 OskariLayer layer = LayerImportExport.deserializeLayer(
-                                layerJSON,
-                                inspireThemeService,
-                                layerGroupService);
+                        layerJSON,
+                        inspireThemeService,
+                        layerGroupService);
                 layers.add(layer);
             }
             return layers;
@@ -158,5 +179,15 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
             throw new ActionException("Failed to create response JSON!");
         }
     }
+
+    public void addPermissions(List<OskariLayer> layers, List<JSONObject> layerJSONs) {
+        for (int i = 0; i < layerJSONs.size(); i++) {
+            OskariLayer layer = layers.get(i);
+            JSONObject layerJSON = layerJSONs.get(i);
+            RoleHelper.savePermissions(layer, roleService,
+                    layerJSON.optJSONObject("role_permissions"));
+        }
+    }
+
 
 }

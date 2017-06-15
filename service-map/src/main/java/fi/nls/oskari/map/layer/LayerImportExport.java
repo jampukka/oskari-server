@@ -14,9 +14,9 @@ import fi.nls.oskari.log.LogFactory;
 import fi.nls.oskari.log.Logger;
 
 public class LayerImportExport {
-    
+
     private static final Logger LOG = LogFactory.getLogger(LayerImportExport.class);
-    
+
     /**
      * Minimal implementation for converting OskariLayer to JSON
      * @see #parseLayer(final JSONObject json)
@@ -59,10 +59,10 @@ public class LayerImportExport {
         json.put("version", layer.getVersion());
         json.put("params", layer.getParams());
         json.put("options", layer.getOptions());
-        
+
         return json;
     }
-    
+
     public static void serializeTypeSpecificInfo(final OskariLayer layer, final JSONObject json) {
         switch (layer.getType()) {
         case OskariLayer.TYPE_WFS:
@@ -73,7 +73,7 @@ public class LayerImportExport {
             break;
         }
     }
-    
+
     /**
      * Minimal implementation for parsing layer in json format.
      * @see serializeLayer(final OskariLayer layer)
@@ -142,7 +142,7 @@ public class LayerImportExport {
 
         return layer;
     }
-    
+
     public static void deserializeTypeSpecificInfo(final OskariLayer layer, final JSONObject json) {
         switch (layer.getType()) {
         case OskariLayer.TYPE_WFS:
@@ -164,7 +164,7 @@ public class LayerImportExport {
         if (map != null) {
             try {
                 return map.values().iterator().next();
-            } catch (NoSuchElementException ignore) {}
+            } catch (NullPointerException | NoSuchElementException ignore) {}
         }
         return null;
     }
