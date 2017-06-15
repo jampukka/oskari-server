@@ -4,14 +4,12 @@ import fi.nls.oskari.annotation.OskariActionRoute;
 import fi.nls.oskari.control.ActionException;
 import fi.nls.oskari.control.ActionHandler;
 import fi.nls.oskari.control.ActionParameters;
-import fi.nls.oskari.service.ServiceException;
 
 import fi.nls.oskari.service.styles.SldStyle;
 import fi.nls.oskari.service.styles.SldStylesService;
 import fi.nls.oskari.service.styles.SldStylesServiceMybatisImpl;
 import fi.nls.oskari.util.JSONHelper;
 import fi.nls.oskari.util.ResponseHelper;
-import fi.nls.oskari.util.ServiceFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 

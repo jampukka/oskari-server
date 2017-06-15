@@ -10,9 +10,10 @@ import fi.nls.oskari.log.Logger;
 import fi.nls.oskari.map.layer.LayerGroupService;
 import fi.nls.oskari.util.JSONHelper;
 import fi.nls.oskari.util.ResponseHelper;
-import fi.nls.oskari.util.ServiceFactory;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.oskari.common.ServiceFactory;
 
 import java.util.List;
 

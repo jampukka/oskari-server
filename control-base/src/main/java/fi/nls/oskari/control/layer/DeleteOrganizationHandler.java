@@ -1,5 +1,7 @@
 package fi.nls.oskari.control.layer;
 
+import org.oskari.common.ServiceFactory;
+
 import fi.nls.oskari.annotation.OskariActionRoute;
 import fi.nls.oskari.control.ActionDeniedException;
 import fi.nls.oskari.control.ActionException;
@@ -9,7 +11,6 @@ import fi.nls.oskari.log.LogFactory;
 import fi.nls.oskari.log.Logger;
 import fi.nls.oskari.map.layer.LayerGroupService;
 import fi.nls.oskari.util.ConversionHelper;
-import fi.nls.oskari.util.ServiceFactory;
 
 /**
  * Admin WMS organization layer delete

@@ -2,6 +2,7 @@ package fi.nls.oskari.control.layer;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
+
 import fi.nls.oskari.annotation.OskariActionRoute;
 import fi.nls.oskari.control.*;
 import fi.nls.oskari.domain.map.OskariLayer;
@@ -10,12 +11,14 @@ import fi.nls.oskari.log.Logger;
 import fi.nls.oskari.map.layer.formatters.LayerJSONFormatter;
 import fi.nls.oskari.map.layer.formatters.LayerJSONFormatterWMS;
 import fi.nls.oskari.util.*;
-import org.eclipse.emf.common.util.Enumerator;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.oskari.common.ServiceFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
 import java.net.HttpURLConnection;
 import java.util.*;
 

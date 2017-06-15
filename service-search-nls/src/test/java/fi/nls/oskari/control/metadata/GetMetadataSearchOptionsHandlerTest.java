@@ -6,9 +6,9 @@ import fi.nls.oskari.control.ActionParameters;
 import fi.nls.oskari.search.channel.MetadataCatalogueChannelSearchService;
 import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.util.PropertyUtil;
-import fi.nls.oskari.util.ServiceFactory;
 import fi.nls.test.control.JSONActionRouteTest;
 import fi.nls.test.util.ResourceHelper;
+
 import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -16,6 +16,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.oskari.common.ServiceFactory;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;

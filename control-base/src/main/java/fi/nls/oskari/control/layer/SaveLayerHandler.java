@@ -1,5 +1,24 @@
 package fi.nls.oskari.control.layer;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.oskari.common.ServiceFactory;
+
 import fi.mml.map.mapwindow.service.db.InspireThemeService;
 import fi.mml.map.mapwindow.service.db.MaplayerProjectionService;
 import fi.mml.map.mapwindow.service.wms.WebMapService;
@@ -9,7 +28,11 @@ import fi.mml.portti.domain.permissions.Permissions;
 import fi.mml.portti.service.db.permissions.PermissionsService;
 import fi.nls.oskari.annotation.OskariActionRoute;
 import fi.nls.oskari.cache.JedisManager;
-import fi.nls.oskari.control.*;
+import fi.nls.oskari.control.ActionDeniedException;
+import fi.nls.oskari.control.ActionException;
+import fi.nls.oskari.control.ActionHandler;
+import fi.nls.oskari.control.ActionParameters;
+import fi.nls.oskari.control.ActionParamsException;
 import fi.nls.oskari.domain.User;
 import fi.nls.oskari.domain.map.InspireTheme;
 import fi.nls.oskari.domain.map.LayerGroup;
@@ -26,7 +49,12 @@ import fi.nls.oskari.permission.domain.Permission;
 import fi.nls.oskari.service.ServiceException;
 import fi.nls.oskari.service.capabilities.CapabilitiesCacheService;
 import fi.nls.oskari.service.capabilities.OskariLayerCapabilities;
-import fi.nls.oskari.util.*;
+import fi.nls.oskari.util.ConversionHelper;
+import fi.nls.oskari.util.GetLayerKeywords;
+import fi.nls.oskari.util.JSONHelper;
+import fi.nls.oskari.util.PropertyUtil;
+import fi.nls.oskari.util.RequestHelper;
+import fi.nls.oskari.util.ResponseHelper;
 import fi.nls.oskari.wfs.GetGtWFSCapabilities;
 import fi.nls.oskari.wfs.WFSLayerConfigurationService;
 import fi.nls.oskari.wfs.util.WFSParserConfigs;
@@ -34,13 +62,6 @@ import fi.nls.oskari.wmts.WMTSCapabilitiesParser;
 import fi.nls.oskari.wmts.domain.ResourceUrl;
 import fi.nls.oskari.wmts.domain.WMTSCapabilities;
 import fi.nls.oskari.wmts.domain.WMTSCapabilitiesLayer;
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import javax.servlet.http.HttpServletRequest;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.*;
 
 /**
  * Admin insert/update of WMS map layer

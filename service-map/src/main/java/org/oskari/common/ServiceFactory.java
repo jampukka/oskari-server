@@ -1,4 +1,4 @@
-package fi.nls.oskari.util;
+package org.oskari.common;
 
 
 import fi.mml.map.mapwindow.service.db.InspireThemeService;

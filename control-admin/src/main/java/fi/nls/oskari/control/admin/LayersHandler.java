@@ -11,17 +11,20 @@ import javax.servlet.http.HttpServletResponse;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.oskari.common.ServiceFactory;
 
+import fi.mml.map.mapwindow.service.db.InspireThemeService;
 import fi.nls.oskari.annotation.OskariActionRoute;
 import fi.nls.oskari.control.ActionException;
 import fi.nls.oskari.control.ActionParameters;
 import fi.nls.oskari.domain.map.OskariLayer;
 import fi.nls.oskari.log.LogFactory;
 import fi.nls.oskari.log.Logger;
+import fi.nls.oskari.map.layer.LayerGroupService;
+import fi.nls.oskari.map.layer.LayerImportExport;
 import fi.nls.oskari.map.layer.OskariLayerService;
-import fi.nls.oskari.map.layer.OskariLayerServiceIbatisImpl;
-import fi.nls.oskari.map.layer.formatters.LayerJSONFormatter;
 import fi.nls.oskari.util.IOHelper;
+import fi.nls.oskari.util.JSONHelper;
 import fi.nls.oskari.util.RequestHelper;
 import fi.nls.oskari.util.ResponseHelper;
 
@@ -29,22 +32,29 @@ import fi.nls.oskari.util.ResponseHelper;
 public class LayersHandler extends AdminOnlyRestActionHandler {
 
     private static final Logger LOG = LogFactory.getLogger(LayersHandler.class);
-    private static final LayerJSONFormatter FORMATTER = new LayerJSONFormatter();
 
-    private final OskariLayerService service;
+    private final OskariLayerService layerService;
+    private final InspireThemeService inspireThemeService;
+    private final LayerGroupService layerGroupService;
 
     public LayersHandler() {
-        this(new OskariLayerServiceIbatisImpl());
+        this(ServiceFactory.getMapLayerService(),
+                ServiceFactory.getInspireThemeService(),
+                ServiceFactory.getLayerGroupService());
     }
 
-    public LayersHandler(OskariLayerService service) {
-        this.service = service;
+    public LayersHandler(OskariLayerService layerService,
+            InspireThemeService inspireThemeService,
+            LayerGroupService layerGroupService) {
+        this.layerService = layerService;
+        this.inspireThemeService = inspireThemeService;
+        this.layerGroupService = layerGroupService;
     }
 
     @Override
     public void handleGet(ActionParameters params) throws ActionException {
-        List<OskariLayer> layers = getLayers(params.getHttpParam("id"));
-        JSONArray response = serializeLayers(layers);
+        List<OskariLayer> layers = findLayers(params.getHttpParam("id"));
+        JSONArray response = serialize(layers);
         ResponseHelper.writeResponse(params, HttpServletResponse.SC_OK, response);
     }
 
@@ -57,34 +67,28 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
         }
 
         byte[] body = RequestHelper.readRequestBody(req);
-        if (body == null || body.length == 0) {
-            throw new ActionException("Failed to read request!");
+        List<JSONObject> layerJSONs = parseJSONObjects(body);
+        List<OskariLayer> layers = deserialize(layerJSONs);
+        int count = layerService.insertAll(layers);
+        if (count == -1) {
+            throw new ActionException("Failed to insert layers!");
         }
-
-        final List<OskariLayer> layers = parseLayers(body);
-        insertLayers(layers);
 
         JSONArray response = createResponse(layers);
         ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, response);
     }
 
-    private void insertLayers(List<OskariLayer> layers) throws ActionException {
-        if (service.insertAll(layers) == -1) {
-            throw new ActionException("Failed to insert layers!");
-        }
-    }
-
-    protected List<OskariLayer> getLayers(String id) {
+    protected List<OskariLayer> findLayers(String id) {
         if (id == null || id.length() == 0) {
             // &id= missing or empty => return all
-            return service.findAll();
+            return layerService.findAll();
         } else if (id.indexOf(',') >= 0) {
             // Comma separated list of ids
-            return service.find(Arrays.asList(id.split(",")), null);
+            return layerService.find(Arrays.asList(id.split(",")), null);
         } else {
             // Single id
             List<OskariLayer> layers = new ArrayList<>(1);
-            OskariLayer layer = service.find(id);
+            OskariLayer layer = layerService.find(id);
             if (layer != null) {
                 layers.add(layer);
             }
@@ -92,31 +96,45 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
         }
     }
 
-    protected JSONArray serializeLayers(List<OskariLayer> layers) throws ActionException {
+    protected List<JSONObject> parseJSONObjects(byte[] jsonBytes) throws ActionException {
+        if (jsonBytes == null || jsonBytes.length == 0) {
+            throw new ActionException("Missing input!");
+        }
+        String jsonString = new String(jsonBytes, StandardCharsets.UTF_8);
         try {
-            JSONArray array = new JSONArray();
+            JSONArray jsonArr = new JSONArray(jsonString);
+            return JSONHelper.getJSONObjects(jsonArr);
+        } catch (JSONException e) {
+            throw new ActionException("Invalid input! Expected JSON Array of JSON Objects!");
+        }
+    }
+
+    protected JSONArray serialize(List<OskariLayer> layers) throws ActionException {
+        try {
+            JSONArray jsonArr = new JSONArray();
             for (OskariLayer layer : layers) {
-                array.put(FORMATTER.serializeLayer(layer));
+                jsonArr.put(LayerImportExport.serializeLayer(layer));
             }
-            return array;
+            return jsonArr;
         } catch (JSONException e) {
             LOG.warn(e);
             throw new ActionException("Failed to write layers as JSON!");
         }
     }
 
-    protected List<OskariLayer> parseLayers(byte[] body) throws ActionException {
+    protected List<OskariLayer> deserialize(List<JSONObject> layerJSONs) throws ActionException {
+        if (layerJSONs == null) {
+            return new ArrayList<OskariLayer>(0);
+        }
+
         try {
             List<OskariLayer> layers = new ArrayList<>();
-            String jsonString = new String(body, StandardCharsets.UTF_8);
-            JSONArray array = new JSONArray(jsonString);
-            for (int i = 0; i < array.length(); i++) {
-                Object obj = array.get(i);
-                if (obj instanceof JSONObject) {
-                    layers.add(FORMATTER.parseLayer((JSONObject) obj));
-                } else {
-                    throw new ActionException("Invalid input! Array item " + i + " not an object!");
-                }
+            for (JSONObject layerJSON : layerJSONs) {
+                OskariLayer layer = LayerImportExport.deserializeLayer(
+                                layerJSON,
+                                inspireThemeService,
+                                layerGroupService);
+                layers.add(layer);
             }
             return layers;
         } catch (JSONException e) {
@@ -125,10 +143,10 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
         }
     }
 
-    protected JSONArray createResponse(List<OskariLayer> layers) throws ActionException {
+    protected JSONArray createResponse(List<OskariLayer> insertedLayers) throws ActionException {
         try {
             JSONArray array = new JSONArray();
-            for (OskariLayer layer : layers) {
+            for (OskariLayer layer : insertedLayers) {
                 JSONObject json = new JSONObject();
                 json.put("id", layer.getId());
                 json.put("url", layer.getUrl());

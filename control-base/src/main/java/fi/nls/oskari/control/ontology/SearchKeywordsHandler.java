@@ -18,8 +18,10 @@ import fi.nls.oskari.ontology.service.KeywordService;
 import fi.nls.oskari.ontology.service.KeywordServiceIbatisImpl;
 import fi.nls.oskari.util.*;
 import fi.nls.oskari.wfs.WFSCapabilitiesParser;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.oskari.common.ServiceFactory;
 
 import java.util.*;
 
