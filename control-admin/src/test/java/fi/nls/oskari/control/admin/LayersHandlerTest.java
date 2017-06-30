@@ -43,10 +43,9 @@ public class LayersHandlerTest extends JSONActionRouteTest {
     public void whenNoEntriesAreFoundReturnsEmptyJSONArray() throws ActionException {
         ActionParameters params = getActionParametersWithAdminUser();
         params.setRequest(mockHttpServletRequest("GET"));
-        byte[] body = sendRequestGetResponse(params);
-
-        assertNotNull(body);
-        assertEquals("[]", new String(body));
+        byte[] response = sendRequestAndGetResponse(params);
+        assertNotNull(response);
+        assertEquals("[]", new String(response));
     }
 
     @Test
@@ -58,7 +57,7 @@ public class LayersHandlerTest extends JSONActionRouteTest {
 
         ActionParameters params = getActionParametersWithAdminUser();
         params.setRequest(mockHttpServletRequest("GET"));
-        byte[] body = sendRequestGetResponse(params);
+        byte[] body = sendRequestAndGetResponse(params);
         List<OskariLayer> layers = handler.deserialize(handler.parseJSONObjects(body));
         assertEquals(2, layers.size());
     }
@@ -80,8 +79,8 @@ public class LayersHandlerTest extends JSONActionRouteTest {
 
         ActionParameters params = getActionParametersWithAdminUser();
         params.setRequest(mockHttpServletRequest("GET"));
-        byte[] body = sendRequestGetResponse(params);
-        List<OskariLayer> layers = handler.deserialize(handler.parseJSONObjects(body));
+        byte[] response = sendRequestAndGetResponse(params);
+        List<OskariLayer> layers = handler.deserialize(handler.parseJSONObjects(response));
         assertEquals(1, layers.size());
         OskariLayer returned = layers.get(0);
         assertEquals(l1, returned);
@@ -111,48 +110,13 @@ public class LayersHandlerTest extends JSONActionRouteTest {
 
         ActionParameters params = getActionParametersWithAdminUser();
         params.setRequest(mockHttpServletRequest("GET"));
-        byte[] body = sendRequestGetResponse(params);
-        List<OskariLayer> layers = handler.deserialize(handler.parseJSONObjects(body));
+        byte[] response = sendRequestAndGetResponse(params);
+        List<OskariLayer> layers = handler.deserialize(handler.parseJSONObjects(response));
         assertEquals(2, layers.size());
         for (OskariLayer layer : layers) {
             assertNotEquals(l2.getId(), layer.getId());
         }
     }
-
-    /*
-    @Test
-    public void whenPOSTingValidJSONRespondsWithJSONContainingTheIdAndUuid()
-            throws JSONException, ActionException {
-        OskariLayer layer = getDummy();
-        JSONObject viewJSON = ViewHelper.viewToJson(bundleService, view);
-        byte[] rawInput = viewJSON.toString().getBytes(StandardCharsets.UTF_8);
-        InputStream payload = new ByteArrayInputStream(rawInput);
-
-        ByteArrayOutputStream respOut = new ByteArrayOutputStream();
-
-        ActionParameters params = new ActionParameters();
-        params.setRequest(mockHttpServletRequest("POST", null,
-                "application/json;charset=UTF-8", rawInput.length, payload));
-        params.setResponse(mockHttpServletResponse(respOut));
-        params.setUser(getAdminUser());
-
-        views.handleAction(params);
-
-        byte[] body = respOut.toByteArray();
-        assertNotNull(body);
-        assertTrue(body.length > 0);
-
-        String bodyStr = new String(body, StandardCharsets.UTF_8);
-        JSONObject json = new JSONObject(bodyStr);
-
-        assertTrue(json.has("id"));
-        assertTrue(json.getLong("id") > -1L);
-        assertTrue(json.has("uuid"));
-        String uuid = json.getString("uuid");
-        assertNotNull(uuid);
-        assertEquals(36, uuid.length());
-    }
-     */
 
     private ActionParameters getActionParametersWithAdminUser() {
         ActionParameters params = new ActionParameters();
@@ -160,7 +124,7 @@ public class LayersHandlerTest extends JSONActionRouteTest {
         return params;
     }
 
-    private byte[] sendRequestGetResponse(ActionParameters params) throws ActionException {
+    private byte[] sendRequestAndGetResponse(ActionParameters params) throws ActionException {
         ByteArrayOutputStream respOut = new ByteArrayOutputStream();
         params.setResponse(mockHttpServletResponse(respOut));
         handler.handleAction(params);
