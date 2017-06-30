@@ -11,7 +11,6 @@ import fi.nls.oskari.util.IOHelper;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.oskari.common.ServiceFactory;
-import org.oskari.control.users.RoleHelper;
 
 import java.io.IOException;
 import java.util.List;

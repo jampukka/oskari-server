@@ -21,6 +21,7 @@ import fi.nls.oskari.domain.map.OskariLayer;
 import fi.nls.oskari.map.layer.OskariLayerService;
 import fi.nls.oskari.map.layer.OskariLayerServiceMemory;
 import fi.nls.oskari.map.view.ViewException;
+import fi.nls.oskari.user.IbatisRoleService;
 import fi.nls.test.control.JSONActionRouteTest;
 
 public class LayersHandlerTest extends JSONActionRouteTest {
@@ -33,7 +34,9 @@ public class LayersHandlerTest extends JSONActionRouteTest {
         layerService = new OskariLayerServiceMemory();
         handler = new LayersHandler(layerService, 
                 ServiceFactory.getInspireThemeService(),
-                ServiceFactory.getLayerGroupService());
+                ServiceFactory.getLayerGroupService(),
+                ServiceFactory.getPermissionsService(),
+                new IbatisRoleService());
     }
 
     @Test

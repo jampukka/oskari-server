@@ -1,4 +1,4 @@
-package org.oskari.control.users;
+package fi.nls.oskari.db;
 
 import java.util.ArrayList;
 import java.util.Collections;
