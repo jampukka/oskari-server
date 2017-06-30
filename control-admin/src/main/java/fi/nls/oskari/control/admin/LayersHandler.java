@@ -25,8 +25,6 @@ import fi.nls.oskari.log.Logger;
 import fi.nls.oskari.map.layer.LayerGroupService;
 import fi.nls.oskari.map.layer.LayerImportExport;
 import fi.nls.oskari.map.layer.OskariLayerService;
-import fi.nls.oskari.permission.domain.Permission;
-import fi.nls.oskari.permission.domain.Resource;
 import fi.nls.oskari.user.IbatisRoleService;
 import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.util.JSONHelper;
@@ -88,8 +86,6 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
         final JSONArray response = createResponse(layers);
         ResponseHelper.writeResponse(params, HttpServletResponse.SC_CREATED, response);
     }
-
-
 
     private void insertLayers(List<OskariLayer> layers) throws ActionException {
         final int count = layerService.insertAll(layers);
@@ -155,6 +151,7 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
                         layerJSON,
                         inspireThemeService,
                         layerGroupService);
+                LayerImportExport.deserializeTypeSpecificInfo(layer, layerJSON);
                 layers.add(layer);
             }
             return layers;
@@ -188,6 +185,5 @@ public class LayersHandler extends AdminOnlyRestActionHandler {
                     layerJSON.optJSONObject("role_permissions"));
         }
     }
-
 
 }

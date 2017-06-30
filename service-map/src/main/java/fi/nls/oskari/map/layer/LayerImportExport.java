@@ -66,12 +66,27 @@ public class LayerImportExport {
     public static void serializeTypeSpecificInfo(final OskariLayer layer, final JSONObject json) {
         switch (layer.getType()) {
         case OskariLayer.TYPE_WFS:
+            serializeWFSSpecificInfo(layer, json);
             break;
         case OskariLayer.TYPE_WMS:
+            serializeWMSSpecificInfo(layer, json);
             break;
         case OskariLayer.TYPE_WMTS:
+            serializeWMTSSpecificInfo(layer, json);
             break;
         }
+    }
+
+    private static void serializeWFSSpecificInfo(final OskariLayer layer, final JSONObject json) {
+        // TODO
+    }
+
+    private static void serializeWMSSpecificInfo(final OskariLayer layer, final JSONObject json) {
+        // TODO
+    }
+
+    private static void serializeWMTSSpecificInfo(final OskariLayer layer, final JSONObject json) {
+        // TODO
     }
 
     /**
@@ -146,12 +161,27 @@ public class LayerImportExport {
     public static void deserializeTypeSpecificInfo(final OskariLayer layer, final JSONObject json) {
         switch (layer.getType()) {
         case OskariLayer.TYPE_WFS:
+            deserializeWFSSpecificInfo(layer, json);
             break;
         case OskariLayer.TYPE_WMS:
+            deserializeWMSSpecificInfo(layer, json);
             break;
         case OskariLayer.TYPE_WMTS:
+            deserializeWMTSSpecificInfo(layer, json);
             break;
         }
+    }
+
+    private static void deserializeWFSSpecificInfo(final OskariLayer layer, final JSONObject json) {
+        // TODO
+    }
+
+    private static void deserializeWMSSpecificInfo(final OskariLayer layer, final JSONObject json) {
+        // TODO
+    }
+
+    private static void deserializeWMTSSpecificInfo(final OskariLayer layer, final JSONObject json) {
+        // TODO
     }
 
     /**
