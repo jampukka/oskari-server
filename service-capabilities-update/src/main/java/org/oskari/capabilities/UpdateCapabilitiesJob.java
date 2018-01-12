@@ -143,7 +143,7 @@ public class UpdateCapabilitiesJob extends ScheduledJob {
 
         for (OskariLayer layer : layers) {
             try {
-                OskariLayerCapabilitiesHelper.setPropertiesFromCapabilitiesWMTS(wmts, layer, null);
+                OskariLayerCapabilitiesHelper.setPropertiesFromCapabilitiesWMTS(wmts, layer);
                 layerService.update(layer);
             } catch (IllegalArgumentException e) {
                 LOG.warn(e, "Failed to update layerId:", layer.getId());

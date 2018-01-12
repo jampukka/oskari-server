@@ -290,7 +290,6 @@ public class SaveLayerHandler extends ActionHandler {
 
         ml.setLegendImage(params.getHttpParam("legendImage", ml.getLegendImage()));
         ml.setMetadataId(params.getHttpParam("metadataId", ml.getMetadataId()));
-        ml.setTileMatrixSetId(params.getHttpParam("tileMatrixSetId"));
 
         final String gfiContent = request.getParameter("gfiContent");
         if (gfiContent != null) {
@@ -499,10 +498,9 @@ public class SaveLayerHandler extends ActionHandler {
 
     private boolean handleWMTSSpecific(final ActionParameters params, OskariLayer ml) {
         try {
-            String currentCrs = params.getHttpParam(PARAM_SRS_NAME, ml.getSrs_name());
             OskariLayerCapabilities raw = capabilitiesService.getCapabilities(ml, true);
             WMTSCapabilities caps = WMTSCapabilitiesParser.parseCapabilities(raw.getData());
-            OskariLayerCapabilitiesHelper.setPropertiesFromCapabilitiesWMTS(caps, ml, currentCrs);
+            OskariLayerCapabilitiesHelper.setPropertiesFromCapabilitiesWMTS(caps, ml);
             return true;
         } catch (Exception ex) {
             LOG.error(ex, "Couldn't update capabilities for layer", ml);

@@ -63,7 +63,7 @@ public class OskariLayerCapabilitiesHelper {
     }
 
     public static void setPropertiesFromCapabilitiesWMTS(WMTSCapabilities caps,
-            OskariLayer ml, String crs) {
+            OskariLayer ml) {
         int id = ml.getId();
         String name = ml.getName();
 
@@ -95,9 +95,6 @@ public class OskariLayerCapabilitiesHelper {
         JSONObject jscaps = LayerJSONFormatterWMTS.createCapabilitiesJSON(layer);
         ml.setCapabilities(jscaps);
         ml.setCapabilitiesLastUpdated(new Date());
-
-        crs = crs != null ? crs : ml.getSrs_name();
-        ml.setTileMatrixSetId(LayerJSONFormatterWMTS.getTileMatrixSetId(jscaps, crs));
     }
 
 }
