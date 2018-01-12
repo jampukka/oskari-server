@@ -34,6 +34,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -282,20 +283,20 @@ public class GetGtWFSCapabilities {
      * @param name
      * @return
      */
-    public static Set<String> parseProjections(Map<String, Object> capa, String version, String name)
-    {
+    public static Set<String> parseProjections(Map<String, Object> capa, String name) {
         if (capa == null) {
             return null;
         }
         if (capa.containsKey("WFSDataStore")) {
             WFSDataStore data = (WFSDataStore) capa.get("WFSDataStore");
-            return parseWfs1xProjections(data, version, name);
+            return parseWfs1xProjections(data, name);
         } else if (capa.containsKey("FeatureTypeList")) {
-            Map<String,  ArrayList<WFS2FeatureType>> data = (Map<String,  ArrayList<WFS2FeatureType>>) capa.get("FeatureTypeList");
-            return parseWfs2xProjections(data, version, name);
+            Map<String, List<WFS2FeatureType>> featureTypes = (Map<String, List<WFS2FeatureType>>) capa.get("FeatureTypeList");
+            List<WFS2FeatureType> featureTypesByName = featureTypes.get(name);
+            WFS2FeatureType featureType = featureTypesByName.get(0);
+            return parseWfs2xProjections(featureType);
         }
         return null;
-
     }
 
     /**
@@ -421,75 +422,59 @@ public class GetGtWFSCapabilities {
      * @param data geotools wfs DataStore
      * @throws fi.nls.oskari.service.ServiceException
      */
-    public static Set<String> parseWfs1xProjections(WFSDataStore data, String version, String typeName) {
+    public static Set<String> parseWfs1xProjections(WFSDataStore data, String typeName) {
         if (data == null || typeName == null) {
-            return null;
+            return Collections.emptySet();
         }
-        Set<String> crss = new HashSet<String>();
         try {
             //There is no way to get Other crs - maybe next gt version will support it - not yet in gt 14.2 or gt 15.0
             //Get only the default crs
             String crs = CRS.lookupIdentifier(data.getFeatureSource(typeName).getInfo().getCRS(), true);
-            if(crs != null){
-                crss.add(crs);
-                return crss;
-            }
-
-
+            return Collections.singleton(crs);
         } catch (Exception ex) {
-
+            log.warn(ex, "Parse WFS1.x projections failed for featureType:", typeName);
         }
-        return null;
+        return Collections.emptySet();
     }
 
     /**
      * Parse supported layer projections wfs 2.x
      *
-     * @param typeNames  wfs featuretype list
-     * @throws fi.nls.oskari.service.ServiceException
+     * @param featureType
      */
-    public static Set<String> parseWfs2xProjections(Map<String,  ArrayList<WFS2FeatureType>> typeNames, String version, String typeName) {
-
-        if (typeNames == null || typeName == null) {
-            return null;
+    public static Set<String> parseWfs2xProjections(WFS2FeatureType featureType) {
+        if (featureType == null) {
+            return Collections.emptySet();
         }
-        Set<String> crss = new HashSet<String>();
-        try {
-            // Array is used because of duplicate key values  - data config could be not equal to same featuretype
-            // Use 1st one in this context
-            ArrayList<WFS2FeatureType> arrFeas = typeNames.get(typeName);
-            WFS2FeatureType  featureType = arrFeas.get(0);
-             crss.add(ProjectionHelper.shortSyntaxEpsg(featureType.getDefaultSrs()));
-            if(featureType.getOtherSrs() != null && featureType.getOtherSrs().length > 0 )
-            for (String s: featureType.getOtherSrs()) {
+        final Set<String> crss = new HashSet<>();
+        crss.add(ProjectionHelper.shortSyntaxEpsg(featureType.getDefaultSrs()));
+        if (featureType.getOtherSrs() != null) {
+            for (String s : featureType.getOtherSrs()) {
                 crss.add(ProjectionHelper.shortSyntaxEpsg(s));
             }
-            return crss;
-
-        } catch (Exception ex) {
-            log.warn("Couldn't get wfs supported feature CRSs - exception: ", ex);
         }
-        return null;
+        return crss;
     }
 
+    // TODO: FIXME: I'm a terrible hack
     public static String isCurrentCRSinCapabilities(WFS2FeatureType featureType, String currentCrs) {
-
-        if (featureType == null || currentCrs == null  ) {
+        if (featureType == null || currentCrs == null) {
             return "";
         }
-        Set<String> crss = new HashSet<String>();
         try {
             // Array is used because of duplicate key values  - data config could be not equal to same featuretype
             // Use 1st one in this context
-            crss.add(ProjectionHelper.shortSyntaxEpsg(featureType.getDefaultSrs()));
-            if(featureType.getOtherSrs() != null && featureType.getOtherSrs().length > 0 )
-                for (String s: featureType.getOtherSrs()) {
-                    crss.add(ProjectionHelper.shortSyntaxEpsg(s));
-                }
-            if(!crss.contains(currentCrs)) {
-                return " *";
+            if (currentCrs.equals(ProjectionHelper.shortSyntaxEpsg(featureType.getDefaultSrs()))) {
+                return "";
             }
-            return "";
+            if (featureType.getOtherSrs() != null) {
+                for (String s: featureType.getOtherSrs()) {
+                    if (currentCrs.equals(ProjectionHelper.shortSyntaxEpsg(s))) {
+                        return "";
+                    }
+                }
+            }
+            return " *";
         } catch (Exception ex) {
             log.warn("Couldn't compare map CRS to features supported CRSs - exception: ", ex);
         }
