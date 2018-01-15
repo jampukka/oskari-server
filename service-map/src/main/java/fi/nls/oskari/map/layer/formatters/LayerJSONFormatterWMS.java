@@ -1,5 +1,17 @@
 package fi.nls.oskari.map.layer.formatters;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import fi.mml.map.mapwindow.service.wms.WebMapService;
 import fi.nls.oskari.domain.map.OskariLayer;
 import fi.nls.oskari.log.LogFactory;
@@ -7,21 +19,10 @@ import fi.nls.oskari.log.Logger;
 import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.util.JSONHelper;
 import fi.nls.oskari.util.PropertyUtil;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
-import java.util.*;
-
-/**
- * Created with IntelliJ IDEA.
- * User: SMAKINEN
- * Date: 17.12.2013
- * Time: 15:37
- * To change this template use File | Settings | File Templates.
- */
 public class LayerJSONFormatterWMS extends LayerJSONFormatter {
 
-    private static Logger log = LogFactory.getLogger(LayerJSONFormatterWMS.class);
+    private static final Logger log = LogFactory.getLogger(LayerJSONFormatterWMS.class);
 
     public static final String KEY_STYLE = "style";
     public static final String KEY_LEGEND = "legend";
@@ -31,6 +32,7 @@ public class LayerJSONFormatterWMS extends LayerJSONFormatter {
     public static final String KEY_GFICONTENT = "gfiContent";
     public static final String KEY_LEGENDIMAGE = "legendImage";
     public static final String KEY_VERSION = "version";
+    public static final String KEY_FORCED_SRS = "forced_srs";
     public static final String KEY_SRS = "srs";
     public static final String KEY_ISQUERYABLE = "isQueryable";
     public static final String KEY_ATTRIBUTES = "attributes";
@@ -63,18 +65,6 @@ public class LayerJSONFormatterWMS extends LayerJSONFormatter {
             }
         }
         includeCapabilitiesInfo(layerJson, layer, layer.getCapabilities());
-        return layerJson;
-    }
-
-    public JSONObject getJSON(OskariLayer layer,
-                              final String lang,
-                              final boolean isSecure,
-                              final WebMapService capabilities) {
-
-        final JSONObject layerJson = getJSON(layer, lang, isSecure);
-        final JSONObject capsJSON = createCapabilitiesJSON(capabilities);
-        includeCapabilitiesInfo(layerJson, layer, capsJSON);
-
         return layerJson;
     }
 
@@ -140,7 +130,16 @@ public class LayerJSONFormatterWMS extends LayerJSONFormatter {
         }
 
         JSONArray srs = JSONHelper.getJSONArray(capabilities, KEY_SRS);
-        JSONHelper.putValue(layerJson, KEY_SRS, srs);
+        if (attrs != null && attrs.has(KEY_FORCED_SRS)) {
+            // Combine forced SRS and ones from capabilities
+            JSONArray forcedSrs = JSONHelper.getJSONArray(attrs, KEY_FORCED_SRS);
+            Set<String> union = new HashSet<>();
+            union.addAll(JSONHelper.getArrayAsList(forcedSrs));
+            union.addAll(JSONHelper.getArrayAsList(srs));
+            JSONHelper.putValue(layerJson, KEY_SRS, new JSONArray(union));
+        } else {
+            JSONHelper.putValue(layerJson, KEY_SRS, srs);
+        }
 
         // copy time from capabilities to attributes
         // timedata is merged into attributes  (times:{start:,end:,interval:}  or times: []
@@ -166,7 +165,10 @@ public class LayerJSONFormatterWMS extends LayerJSONFormatter {
         JSONObject formats = LayerJSONFormatterWMS.getFormatsJSON(wms);
         JSONHelper.putValue(capabilities, KEY_FORMATS, formats);
         JSONHelper.putValue(capabilities, KEY_VERSION, wms.getVersion());
-        JSONHelper.putValue(capabilities, KEY_SRS, new JSONArray(LayerJSONFormatterWMS.getCRSs(wms)));
+
+        JSONArray srsArray = new JSONArray(new HashSet<>(Arrays.asList(wms.getCRSs())));
+        JSONHelper.putValue(capabilities, KEY_SRS, srsArray);
+
         capabilities = JSONHelper.merge(capabilities, LayerJSONFormatterWMS.formatTime(wms.getTime()));
         return capabilities;
     }
@@ -292,21 +294,4 @@ public class LayerJSONFormatterWMS extends LayerJSONFormatter {
         return formatJSON;
     }
 
-    /**
-     * Constructs a unique set of coordinate ref systems supported by the WMS service
-     *
-     * @param wms WebMapService
-     * @return Set<String> containing the supported coordinate ref systems of the WMS service
-     */
-    public static Set<String> getCRSs(WebMapService wms) {
-        String[] crss = wms.getCRSs();
-        if (crss == null || crss.length == 0) {
-            return Collections.emptySet();
-        }
-        Set<String> set = new HashSet<>(crss.length);
-        for (String crs : crss) {
-            set.add(crs);
-        }
-        return set;
-    }
 }

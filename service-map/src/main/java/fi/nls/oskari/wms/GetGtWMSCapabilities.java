@@ -270,7 +270,7 @@ OnlineResource xlink:type="simple" xlink:href="http://www.paikkatietohakemisto.f
             OskariLayerWorker.modifyCommonFieldsForEditing(json, oskariLayer);
 
             // Add *, if current map epsg is not supported in the service capabilities for this layer
-            String remark = LayerJSONFormatterWMS.getCRSs(wmsImpl).contains(currentCrs) ? "" : " *";
+            String remark = Arrays.asList(wmsImpl.getCRSs()).contains(currentCrs) ? "" : " *";
 
             // for admin ui only
             JSONHelper.putValue(json, "title", capabilitiesLayer.getTitle() + remark);

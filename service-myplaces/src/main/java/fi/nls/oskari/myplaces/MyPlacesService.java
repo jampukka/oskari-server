@@ -97,8 +97,9 @@ java.lang.RuntimeException: Unable to encode filter [[ geometry bbox POLYGON ((4
         final WMSCapabilities capabilities = new WMSCapabilities();
         // enable gfi
         capabilities.setQueryable(true);
+        layer.setCapabilities(LayerJSONFormatterWMS.createCapabilitiesJSON(capabilities));
 
-        JSONObject myPlaceLayer = JSON_FORMATTER.getJSON(layer, lang, modifyURLs, capabilities);
+        JSONObject myPlaceLayer = JSON_FORMATTER.getJSON(layer, lang, modifyURLs);
         // flag with metaType for frontend
         JSONHelper.putValue(myPlaceLayer, "metaType", "published");
         return myPlaceLayer;
