@@ -15,14 +15,6 @@ public class LayerJSONFormatterWMTS extends LayerJSONFormatter {
 
     public static final String KEY_TILEMATRIXIDS = "tileMatrixIds";
 
-    /**
-     * @deprecated replaced by {@link #createCapabilitiesJSON(WMTSCapabilitiesLayer layer)}
-     */
-    @Deprecated
-    public static JSONObject createCapabilitiesJSON(final WMTSCapabilities wmts,final WMTSCapabilitiesLayer layer) {
-        return createCapabilitiesJSON(layer);
-    }
-
     @Override
     public JSONObject getJSON(OskariLayer layer,
             final String lang,
@@ -63,6 +55,14 @@ public class LayerJSONFormatterWMTS extends LayerJSONFormatter {
             }
         }
         return layerJson;
+    }
+
+    /**
+     * @deprecated replaced by {@link #createCapabilitiesJSON(WMTSCapabilitiesLayer layer)}
+     */
+    @Deprecated
+    public static JSONObject createCapabilitiesJSON(final WMTSCapabilities wmts,final WMTSCapabilitiesLayer layer) {
+        return createCapabilitiesJSON(layer);
     }
 
     public static JSONObject createCapabilitiesJSON(WMTSCapabilitiesLayer layer) {
