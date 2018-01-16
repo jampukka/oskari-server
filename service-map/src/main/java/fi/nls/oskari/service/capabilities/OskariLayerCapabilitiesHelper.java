@@ -13,6 +13,8 @@ import fi.nls.oskari.wmts.domain.WMTSCapabilities;
 import fi.nls.oskari.wmts.domain.WMTSCapabilitiesLayer;
 
 import java.util.Date;
+import java.util.Set;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -33,8 +35,9 @@ public class OskariLayerCapabilitiesHelper {
         return WebMapServiceFactory.createFromXML(ml.getName(), xml);
     }
 
-    public static void setPropertiesFromCapabilitiesWMS(WebMapService wms, OskariLayer ml) {
-        JSONObject caps = LayerJSONFormatterWMS.createCapabilitiesJSON(wms);
+    public static void setPropertiesFromCapabilitiesWMS(WebMapService wms,
+            OskariLayer ml, Set<String> systemCRSs) {
+        JSONObject caps = LayerJSONFormatterWMS.createCapabilitiesJSON(wms, systemCRSs);
         ml.setCapabilities(caps);
         ml.setCapabilitiesLastUpdated(new Date());
         //TODO: similiar parsing for WMS GetCapabilities for admin layerselector  and this

@@ -2,6 +2,7 @@ package fi.nls.oskari.domain.map.view;
 
 import fi.nls.oskari.util.PropertyUtil;
 import org.apache.commons.lang.text.StrSubstitutor;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.Serializable;
@@ -21,7 +22,7 @@ public class View implements Serializable {
     private List<Bundle> bundles = new ArrayList<Bundle>();
 
     public String getUrl() {
-        final Map<String, String> valuesMap = new HashMap();
+        final Map<String, String> valuesMap = new HashMap<>();
         valuesMap.put("lang", getLang());
         valuesMap.put("uuid", getUuid());
         final StrSubstitutor sub = new StrSubstitutor(valuesMap);
@@ -269,5 +270,12 @@ public class View implements Serializable {
         }
 
         return view;
+    }
+
+    public String getSrsName() throws JSONException {
+        return getBundleByName("mapfull")
+                .getConfigJSON()
+                .getJSONObject("mapOptions")
+                .getString("srsName");
     }
 }

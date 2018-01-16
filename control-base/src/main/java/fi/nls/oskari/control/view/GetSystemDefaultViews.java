@@ -3,7 +3,6 @@ package fi.nls.oskari.control.view;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.json.JSONException;
@@ -16,6 +15,7 @@ import fi.nls.oskari.control.ActionException;
 import fi.nls.oskari.control.ActionHandler;
 import fi.nls.oskari.control.ActionParameters;
 import fi.nls.oskari.domain.map.view.View;
+import fi.nls.oskari.map.view.ViewHelper;
 import fi.nls.oskari.map.view.ViewService;
 import fi.nls.oskari.map.view.ViewServiceIbatisImpl;
 import fi.nls.oskari.service.ServiceException;
@@ -35,28 +35,14 @@ public class GetSystemDefaultViews extends ActionHandler {
 
     @Override
     public void handleAction(ActionParameters params) throws ActionException {
-        List<Long> viewIds = getDefaultViewIds();
-        List<View> views = getViews(viewIds);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        writeResponseJSON(views, baos);
-        ResponseHelper.writeResponse(params, 200, ResponseHelper.CONTENT_TYPE_JSON_UTF8, baos);
-    }
-
-    private List<Long> getDefaultViewIds() throws ActionException {
         try {
-            return viewService.getSystemDefaultViewIds();
+            List<View> views = ViewHelper.getSystemViews(viewService);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            writeResponseJSON(views, baos);
+            ResponseHelper.writeResponse(params, 200, ResponseHelper.CONTENT_TYPE_JSON_UTF8, baos);
         } catch (ServiceException e) {
             throw new ActionException(e.getMessage(), e);
         }
-
-    }
-
-    private List<View> getViews(List<Long> viewIds) {
-        List<View> views = new ArrayList<>(viewIds.size());
-        for (long viewId : viewIds) {
-            views.add(viewService.getViewWithConf(viewId));
-        }
-        return views;
     }
 
     private void writeResponseJSON(List<View> views, OutputStream out) throws ActionException {
@@ -69,16 +55,12 @@ public class GetSystemDefaultViews extends ActionHandler {
         } catch (JSONException | IOException e) {
             throw new ActionException(e.getMessage(), e);
         }
-
     }
 
     private void writeView(View view, JsonGenerator json) throws JSONException, IOException {
         String uuid = view.getUuid();
         String name = view.getName();
-        String srsName = view.getBundleByName("mapfull")
-                .getConfigJSON()
-                .getJSONObject("mapOptions")
-                .getString("srsName");
+        String srsName = view.getSrsName();
 
         json.writeStartObject();
         json.writeStringField("uuid", uuid);

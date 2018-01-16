@@ -152,10 +152,14 @@ public class LayerJSONFormatterWMS extends LayerJSONFormatter {
 
     }
 
-    public static JSONObject createCapabilitiesJSON(final WebMapService wms) {
+    public static JSONObject createCapabilitiesJSON(WebMapService wms) {
+        return createCapabilitiesJSON(wms, null);
+    }
 
+    public static JSONObject createCapabilitiesJSON(WebMapService wms,
+            Set<String> systemCRSs) {
         JSONObject capabilities = new JSONObject();
-        if(wms == null) {
+        if (wms == null) {
             return capabilities;
         }
         JSONHelper.putValue(capabilities, KEY_ISQUERYABLE, wms.isQueryable());
@@ -166,11 +170,27 @@ public class LayerJSONFormatterWMS extends LayerJSONFormatter {
         JSONHelper.putValue(capabilities, KEY_FORMATS, formats);
         JSONHelper.putValue(capabilities, KEY_VERSION, wms.getVersion());
 
-        JSONArray srsArray = new JSONArray(new HashSet<>(Arrays.asList(wms.getCRSs())));
-        JSONHelper.putValue(capabilities, KEY_SRS, srsArray);
+        JSONHelper.putValue(capabilities, KEY_SRS, getSrs(wms, systemCRSs));
 
         capabilities = JSONHelper.merge(capabilities, LayerJSONFormatterWMS.formatTime(wms.getTime()));
         return capabilities;
+    }
+
+    private static JSONArray getSrs(WebMapService wms, Set<String> systemCRSs) {
+        JSONArray srsArray = new JSONArray();
+        if (systemCRSs == null) {
+            // If systemCRSs is null don't filter
+            for (String crs : wms.getCRSs()) {
+                srsArray.put(crs);
+            }
+        } else {
+            for (String crs : wms.getCRSs()) {
+                if (systemCRSs.contains(crs)) {
+                    srsArray.put(crs);
+                }
+            }
+        }
+        return srsArray;
     }
 
     public static List<JSONObject> createStylesArray(final WebMapService capabilities) {
