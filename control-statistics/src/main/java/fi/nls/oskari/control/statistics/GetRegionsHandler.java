@@ -86,7 +86,7 @@ public class GetRegionsHandler extends ActionHandler {
         JSONHelper.putValue(response, KEY_REGIONS, regions);
 
         try {
-            final List<Region> result = regionset.getRegions(srs);
+            final List<Region> result = service.getRegions(regionset, srs);
             for (Region region : result) {
                 regions.put(region.toJSON());
             }
