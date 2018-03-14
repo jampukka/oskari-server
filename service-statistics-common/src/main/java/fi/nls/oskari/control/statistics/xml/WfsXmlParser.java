@@ -15,7 +15,6 @@ import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import com.vividsolutions.jts.geom.Geometry;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -85,10 +84,7 @@ public class WfsXmlParser {
     }
 
     private static JSONObject getGeoJSON(SimpleFeature feature, String idProp, String nameProp) throws IOException {
-        FeatureJSON fj = new FeatureJSON();
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        fj.writeFeature(feature, os);
-        String json = os.toString();
+        String json = new FeatureJSON().toString(feature);
         JSONObject jsonObj = JSONHelper.createJSONObject(json);
         JSONObject props = getProps(jsonObj);
         if(props != null) {

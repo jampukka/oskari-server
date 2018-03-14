@@ -55,6 +55,10 @@ public abstract class RegionSetService extends OskariComponent {
         }
     }
 
+    /**
+     * Read (Simple)FeatureCollection from GeoJSON resource file
+     * transforming geometries to the requestedSRS
+     */
     private SimpleFeatureCollection getRegionsResources(RegionSet regionset, String requestedSRS)
             throws IOException, MismatchedDimensionException, TransformException, FactoryException {
         MathTransform transform = findMathTransform(regionset.getSrs_name(), requestedSRS);
