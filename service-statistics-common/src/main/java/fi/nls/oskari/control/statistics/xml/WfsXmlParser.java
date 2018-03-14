@@ -43,10 +43,8 @@ public class WfsXmlParser {
 
     private static final Logger LOG = LogFactory.getLogger(WfsXmlParser.class);
 
-    public static List<Region> parse(InputStream inputStream, String idProperty, String nameProperty) throws ServiceException {
-
+    public static List<Region> parse(SimpleFeatureCollection fc, String idProperty, String nameProperty) throws ServiceException {
         List<Region> nameCodes = new ArrayList<>();
-        SimpleFeatureCollection fc = getFeatureCollection(inputStream);
         SimpleFeatureIterator it = fc.features();
 
         while (it.hasNext()) {
@@ -77,7 +75,7 @@ public class WfsXmlParser {
         return nameCodes;
     }
 
-    private static SimpleFeatureCollection getFeatureCollection(InputStream inputStream) {
+    public static SimpleFeatureCollection getFeatureCollection(InputStream inputStream) {
         try {
             GML gml = new GML(GML.Version.GML3);
             return gml.decodeFeatureCollection(inputStream);
