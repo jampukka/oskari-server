@@ -98,11 +98,6 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
 
     public static final int FE_READ_TIMEOUT_MS = PropertyUtil.getOptional("oskari.wfs.read.timeout", 30000);
 
-
-
-    protected static final List<List<Object>> EMPTY_LIST = new ArrayList();
-
-
     /**
      * Creates a new runnable job with own Jedis instance
      * 
@@ -163,14 +158,6 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
 
     public String getLayerId() {
         return layerId;
-    }
-
-    /**
-     * Releases all when removed
-     */
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
     }
 
     /**
@@ -258,7 +245,6 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
         }
 
         boolean first = true;
-        int index = 0;
         for(List<Double> bounds : grid) {
             if (!goNext()) {
                 return false;
@@ -338,7 +324,6 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
                 // keep the next tiles
                 this.session.setKeepPrevious(true);
             }
-            index++;
         }
         return true;
     }
@@ -398,7 +383,7 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
 
         if (!this.requestHandler(null)) {
             // success, just no hits
-            this.sendWFSFeatures(EMPTY_LIST, ResultProcessor.CHANNEL_MAP_CLICK);
+            this.sendWFSFeatures(Collections.emptyList(), ResultProcessor.CHANNEL_MAP_CLICK);
             return true;
         }
         this.featuresHandler();
@@ -413,7 +398,7 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
                     ResultProcessor.CHANNEL_MAP_CLICK);
         } else {
             log.debug("No feature data!");
-            this.sendWFSFeatures(EMPTY_LIST, ResultProcessor.CHANNEL_MAP_CLICK);
+            this.sendWFSFeatures(Collections.emptyList(), ResultProcessor.CHANNEL_MAP_CLICK);
         }
         
         // geometries

@@ -1,5 +1,6 @@
 package fi.nls.oskari.work;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Point;
@@ -15,7 +16,6 @@ import fi.nls.oskari.wfs.WFSParser;
 import fi.nls.oskari.wfs.pojo.WFSLayerStore;
 import fi.nls.oskari.wfs.util.HttpHelper;
 import fi.nls.oskari.wfs.extension.UserLayerProcessor;
-import fi.nls.oskari.wfs.LayerProcessor;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.opengis.feature.Property;
@@ -30,7 +30,9 @@ import java.util.*;
  * Job for WFS Map Layer
  */
 public class WFSMapLayerJob extends OWSMapLayerJob {
-	LayerProcessor layerProcessor = new UserLayerProcessor ();
+    
+    public static final ObjectMapper OM = new ObjectMapper();
+    public static final TypeReference<HashMap<String, Object>> TYPE_REF_HASHMAP = new TypeReference<HashMap<String, Object>>() {};
 
 	/**
 	 * Creates a new runnable job with own Jedis instance
@@ -116,22 +118,13 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
         Reader response = ((WFSRequestResponse) requestResponse).getResponse();
         FeatureCollection<SimpleFeatureType, SimpleFeature> features = WFSCommunicator.parseSimpleFeatures(response, layer);
 
-        if (layerProcessor.isProcessable(layer)) {
-			features = layerProcessor.process(features,layer);
+        if (UserLayerProcessor.isProcessable(layer)) {
+			features = UserLayerProcessor.process(features, layer);
         }
 
         IOHelper.close(response);
 
         return features;
-    }
-
-
-    /**
-	 * Releases all when removed
-	 */
-    @Override
-    protected void finalize() throws Throwable {
-    	super.finalize();
     }
 
     /**
@@ -239,7 +232,7 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
             final Collection<Property> featureProperties = this.features.features().next().getProperties();
             for (Property prop : featureProperties) {
                 final String field = prop.getName().toString();
-                if (this.excludedProperties.contains(field)) {
+                if (excludedProperties.contains(field)) {
                     continue;
                 }
                 // don't add geometry
@@ -253,7 +246,7 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
         else {
             log.warn("Tried to determine properties by there's no features!");
         }
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
     }
     /**
      * Parses features values
@@ -375,7 +368,7 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
             return "";
         }
         try {
-            HashMap<String, Object> propMap = new ObjectMapper().readValue(value, HashMap.class);
+            HashMap<String, Object> propMap = OM.readValue(value, TYPE_REF_HASHMAP);
             if(propMap.isEmpty()) {
                 log.debug("Got empty map from value: '" + value + "' - Returning null. Input was", input.getClass().getName());
                 return null;
