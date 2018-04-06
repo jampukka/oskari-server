@@ -711,16 +711,6 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
         log.debug("Sending", geometries.size(), "geometries");
         this.service.addResults(this.session.getClient(), channel, output);
     }
-    /*
-    public abstract Reader request(JobType type, WFSLayerStore layer,
-                                            SessionStore session, List<Double> bounds,
-                                            MathTransform transformService);
-
-
-    public abstract FeatureCollection<SimpleFeatureType, SimpleFeature> response(JobType type, WFSLayerStore layer,
-            SessionStore session, List<Double> bounds,
-            MathTransform transformService);
-            */
 
     /**
      * Gets image from cache

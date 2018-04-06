@@ -24,7 +24,6 @@ import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.filter.Filter;
 import org.opengis.referencing.operation.MathTransform;
 
-import java.io.IOException;
 import java.io.Reader;
 import java.util.*;
 /**
@@ -93,46 +92,38 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
                     WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
         }
 
-        try {
-            // parse response, throws an exception on failure
-            this.features = response(layer, response);
-            final Map<String, Object> output = createCommonResponse();
-            if(features == null || features.isEmpty()) {
-                log.debug("Empty result for", this.layerId, "type:", type);
-                output.put(OUTPUT_FEATURE, "empty");
-                log.debug(PROCESS_ENDED, getKey());
-                if(this.type == JobType.MAP_CLICK) {
-                    output.put(OUTPUT_KEEP_PREVIOUS, this.session.isKeepPrevious());
-                    this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_MAP_CLICK, output);
-                    return false;
-                } else if(this.type == JobType.GEOJSON  || this.type == JobType.PROPERTY_FILTER) {
-                    output.put(OUTPUT_KEEP_PREVIOUS, this.session.isKeepPrevious());
-                    this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_FILTER, output);
-                    return false;
-                }
-                this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_FEATURE, output);
+        // parse response, throws an exception on failure
+        this.features = response(layer, response);
+        final Map<String, Object> output = createCommonResponse();
+        if(features == null || features.isEmpty()) {
+            log.debug("Empty result for", this.layerId, "type:", type);
+            output.put(OUTPUT_FEATURE, "empty");
+            log.debug(PROCESS_ENDED, getKey());
+            if(this.type == JobType.MAP_CLICK) {
+                output.put(OUTPUT_KEEP_PREVIOUS, this.session.isKeepPrevious());
+                this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_MAP_CLICK, output);
+                return false;
+            } else if(this.type == JobType.GEOJSON  || this.type == JobType.PROPERTY_FILTER) {
+                output.put(OUTPUT_KEEP_PREVIOUS, this.session.isKeepPrevious());
+                this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_FILTER, output);
                 return false;
             }
-            // Swap XY in feature geometry, if reverseXY setup in layer attributes
-            if(layer.isReverseXY(session.getLocation().getSrs())){
-                ProjectionHelper.swapGeometryXY(this.features);
-            }
-
-            if(this.features.size() == layer.getMaxFeatures()) {
-                log.debug("Max feature result", this.layerId);
-                output.put(OUTPUT_FEATURE, "max");
-                this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_FEATURE, output);
-            }
-
-            log.debug("Features count", this.features.size());
-            return true;
-        } finally {
-            try {
-                response.close();
-            } catch (IOException e) {
-                return false;
-            }
+            this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_FEATURE, output);
+            return false;
         }
+        // Swap XY in feature geometry, if reverseXY setup in layer attributes
+        if(layer.isReverseXY(session.getLocation().getSrs())){
+            ProjectionHelper.swapGeometryXY(this.features);
+        }
+
+        if(this.features.size() == layer.getMaxFeatures()) {
+            log.debug("Max feature result", this.layerId);
+            output.put(OUTPUT_FEATURE, "max");
+            this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_FEATURE, output);
+        }
+
+        log.debug("Features count", this.features.size());
+        return true;
     }
 
     /**
@@ -176,15 +167,15 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
      */
     public SimpleFeatureCollection response(
             WFSLayerStore layer, Reader response) {
-        SimpleFeatureCollection features = WFSCommunicator.parseSimpleFeatures(response, layer);
-    
-        if (UserLayerProcessor.isProcessable(layer)) {
-    		features = UserLayerProcessor.process(features, layer);
+        try {
+            SimpleFeatureCollection features = WFSCommunicator.parseSimpleFeatures(response, layer);
+            if (UserLayerProcessor.isProcessable(layer)) {
+                features = UserLayerProcessor.process(features, layer);
+            }
+            return features;
+        } finally {
+            IOHelper.close(response);
         }
-    
-        IOHelper.close(response);
-    
-        return features;
     }
 
     /**

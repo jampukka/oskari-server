@@ -164,6 +164,253 @@ public class FEMapLayerJob extends OWSMapLayerJob {
                 this.layer.getFeatureParamsLocales(this.session.getLanguage()));
     }
 
+    /**
+     * Builds the WFS request from template. Issues HTTP request with WFS
+     * request Processes WFS response with 'feature-engine' i.e Groovy scripts.
+     */
+    private FERequestResponse request(List<Double> bounds) {
+        final ArrayList<List<Object>> resultsList = new ArrayList<List<Object>>();
+        final Map<Resource, SimpleFeatureCollection> responseCollections = new HashMap<Resource, SimpleFeatureCollection>();
+
+        final FERequestResponse requestResponse = new FERequestResponse();
+
+        Filter filter = WFSFilter.initBBOXFilter(session.getLocation(), layer, false);
+        requestResponse.setFilter(filter);
+        requestResponse.setResponse(responseCollections);
+        requestResponse.setLocation(session.getLocation());
+
+        final String urlTemplate = layer.getURL();
+        final String requestTemplatePath = layer.getRequestTemplate();
+        final String recipePath = layer.getResponseTemplate();
+        final String username = layer.getUsername();
+        final String password = layer.getPassword();
+
+        final String srsName = session.getLocation().getSrs();
+        final String featureNs = layer.getFeatureNamespaceURI();
+        final String featurePrefix = layer.getFeatureNamespace();
+        final String featureName = layer.getFeatureElement();
+        final String WFSver = layer.getWFSVersion();
+        final String geomProp = layer.getGMLGeometryProperty();
+        final String geomNs = layer.getGeometryNamespaceURI();
+        final String maxCount = Integer.toString(layer.getMaxFeatures());
+        final Boolean resolveDepth = JSONHelper.getBooleanFromJSON(layer.getAttributes(), "resolveDepth", false);
+
+        JSONObject parseConfig = layer.getParseConfig();
+
+        final FERequestTemplate backendRequestTemplate = getRequestTemplate(requestTemplatePath);
+        if (backendRequestTemplate == null) {
+            log.error("NO Request Template available");
+            throw new TransportJobException("NO Request Template available [fe]",
+                    WFSExceptionHelper.ERROR_GETFEATURE_PAYLOAD_FAILED);
+        }
+
+        backendRequestTemplate.setRequestFeatures(srsName, featureNs, featurePrefix,
+                featureName, WFSver, geomProp, geomNs, maxCount, resolveDepth);
+
+        FeatureEngine featureEngine = null;
+        try {
+            featureEngine = getFeatureEngine(recipePath);
+        } catch (Exception e) {
+            throw new TransportJobException(e.getMessage(),
+                    e.getCause(),
+                    WFSExceptionHelper.ERROR_GETFEATURE_ENGINE_FAILED);
+        }
+
+        if (featureEngine == null) {
+            log.error("NO FeatureEngine available - maybe invalid wfs layer configuration");
+            throw new TransportJobException("NO FeatureEngine available - maybe invalid wfs layer configuration",
+                    WFSExceptionHelper.ERROR_GETFEATURE_ENGINE_FAILED);
+        }
+
+        // Is parsing based on parse config
+        if(parseConfig != null){
+            ELF_path_parse_worker worker = new ELF_path_parse_worker(parseConfig);
+            featureEngine.getRecipe().setParseWorker(worker);
+            WFS11_path_parse_worker wfs11worker = new WFS11_path_parse_worker(parseConfig);
+            featureEngine.getRecipe().setWFS11ParseWorker(wfs11worker);
+        }
+
+        final FeatureEngine engine = featureEngine;
+
+        log.debug("[fe] request template " + requestTemplatePath
+                + " instantiated as " + backendRequestTemplate);
+        log.debug("[fe] featureEngine " + recipePath + " instantiated as "
+                + featureEngine);
+
+        this.featureValuesList = resultsList;
+
+        try {
+            /* CRS */
+            //Axis order is x=lon y=lat for each projection in a OL Map
+            final CoordinateReferenceSystem crs = CRS.decode(session
+                    .getLocation().getSrs(), true);
+
+            final MathTransform transform = this.session.getLocation()
+                    .getTransformForClient(crs, true);
+
+            /* FeatureEngine InputProcessor */
+            final XMLInputProcessor inputProcessor = new StaxGMLInputProcessor();
+
+            final OutputProcessor outputProcessor = new FEOutputProcessor(
+                    resultsList, responseCollections, crs, requestResponse,
+                    selectedProperties, selectedPropertiesIndex, transform, geomProp);
+
+            /* Backend HTTP URI info */
+            FEUrl backendUrlInfo = getBackendURL(urlTemplate);
+
+            URL url = new URL(backendUrlInfo.url);
+
+            log.debug("[fe] using URL " + url);
+
+            /* Backend Proxy */
+            HttpHost backendProxy = null;
+
+            if (System.getProperty("http.proxyHost") != null
+                    && System.getProperty("http.proxyPort") != null) {
+
+                if (backendUrlInfo.proxy) {
+                    backendProxy = new HttpHost(
+                            System.getProperty("http.proxyHost"),
+                            Integer.valueOf(
+                                    System.getProperty("http.proxyPort"), 10),
+                            "http");
+                }
+            }
+            /* backendResponseHandler processes HTTP response */
+
+            FEResponseHandler backendResponseHandler = new FEResponseHandler(
+                    engine, inputProcessor, outputProcessor);
+
+            /* Backend HTTP Request */
+            HttpUriRequest backendUriRequest = null;
+            if (backendRequestTemplate.isPost) {
+                HttpPost httppost = new HttpPost(new URI(url.toExternalForm()));
+
+                StringBuffer params = new StringBuffer();
+
+                backendRequestTemplate.buildParams(params, type, layer,
+                        session, bounds, transform, crs);
+
+                log.debug("WFS POST Body " + params);
+
+                StringEntity entity = new StringEntity(params.toString());
+                httppost.setHeader(new BasicHeader("Content-Type",
+                        "text/xml; charset=UTF-8"));
+                httppost.setEntity(entity);
+                log.debug("[fe] HTTP POST " + httppost.getRequestLine());
+
+                backendUriRequest = httppost;
+
+            } else {
+
+                URIBuilder builder = new URIBuilder();
+                builder.setScheme(url.getProtocol());
+                builder.setHost(url.getHost());
+                builder.setPort(url.getPort());
+                builder.setPath(url.getPath());
+                backendRequestTemplate.buildParams(builder, type, layer,
+                        session, bounds, transform, crs);
+
+                HttpGet httpget = new HttpGet(builder.build());
+                log.debug("[fe] HTTP GET " + httpget.getRequestLine());
+
+                backendUriRequest = httpget;
+
+            }
+
+            /* Backend HTTP Executor */
+            final HttpParams httpParams = new BasicHttpParams();
+            HttpConnectionParams.setConnectionTimeout(httpParams, FE_READ_TIMEOUT_MS); //IOHelper.getConnectionTimeoutMs());
+            HttpConnectionParams.setSoTimeout(httpParams, FE_READ_TIMEOUT_MS);
+            DefaultHttpClient backendHttpClient = new DefaultHttpClient(httpParams);
+            try {
+                HttpHost backendHttpHost = new HttpHost(url.getHost(),
+                        url.getPort(), url.getProtocol());
+
+                UsernamePasswordCredentials backendCredentials = getCredentials(
+                        username, password);
+
+                BasicHttpContext backendLocalContext = null;
+                if (backendCredentials != null) {
+
+                    log.debug("[fe] using Credentials "
+                            + backendCredentials.getUserName() + " for " + url);
+
+                    backendHttpClient.getCredentialsProvider().setCredentials(
+                            new AuthScope(backendHttpHost.getHostName(),
+                                    backendHttpHost.getPort()),
+                            backendCredentials);
+
+                    // Create AuthCache instance
+                    AuthCache authCache = new BasicAuthCache();
+                    // Generate BASIC scheme object and add it to the local
+                    // auth cache
+                    BasicScheme basicAuth = new BasicScheme();
+                    authCache.put(backendHttpHost, basicAuth);
+
+                    backendLocalContext = new BasicHttpContext();
+                    backendLocalContext.setAttribute(ClientContext.AUTH_CACHE,
+                            authCache);
+                }
+
+                if (backendProxy != null) {
+                    log.debug("[fe] setting proxy for " + url);
+                    backendHttpClient.getParams().setParameter(
+                            ConnRoutePNames.DEFAULT_PROXY,
+
+                            backendProxy);
+                }
+
+                Boolean succee = backendLocalContext != null ? backendHttpClient
+                        .execute(backendUriRequest, backendResponseHandler,
+                                backendLocalContext) : backendHttpClient
+                        .execute(backendUriRequest, backendResponseHandler);
+
+                        log.debug("[fe] execute response " + succee + " for " + url);
+
+            } catch (HttpResponseException e) {
+                log.error("Error parsing response:", log.getCauseMessages(e));
+                log.debug(e);
+                throw new ServiceRuntimeException("Status code: " + Integer.toString(e.getStatusCode()) + " " + e.getMessage(),
+                        e.getCause(),
+                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
+            } catch (IOException e) {
+                log.error("Error fetching response:", log.getCauseMessages(e));
+                log.debug(e);
+                throw new ServiceRuntimeException(e.getMessage(),
+                        e.getCause(),
+                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
+            } catch (Exception e) {
+                log.error("Error fetching response:", log.getCauseMessages(e));
+                log.debug(e);
+                throw new ServiceRuntimeException(e.getMessage(),
+                        e.getCause(),
+                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
+            } finally {
+                // When HttpClient instance is no longer needed,
+                // shut down the connection manager to ensure
+                // immediate deallocation of all system resources
+                backendHttpClient.getConnectionManager().shutdown();
+                log.debug("[fe] http shutdown for " + url);
+            }
+
+        } catch (ServiceRuntimeException e) {
+            log.error(e);
+            throw new TransportJobException(e.getMessage(),
+                    e.getCause(),
+                    e.getMessageKey());
+        } catch (Exception e) {
+            log.error(e);
+            throw new TransportJobException(e.getMessage(),
+                    e.getCause(),
+                    WFSExceptionHelper.ERROR_FEATURE_PARSING);
+        } finally {
+            log.debug("[fe] end of process");
+        }
+
+        return requestResponse;
+    }
+
     private FeatureEngine getFeatureEngine(String recipePath)
             throws InstantiationException, IllegalAccessException,
             ClassNotFoundException {
@@ -370,253 +617,6 @@ public class FEMapLayerJob extends OWSMapLayerJob {
         }
 
         return true;
-    }
-
-    /**
-     * Builds the WFS request from template. Issues HTTP request with WFS
-     * request Processes WFS response with 'feature-engine' i.e Groovy scripts.
-     */
-    private FERequestResponse request(List<Double> bounds) {
-        final ArrayList<List<Object>> resultsList = new ArrayList<List<Object>>();
-        final Map<Resource, SimpleFeatureCollection> responseCollections = new HashMap<Resource, SimpleFeatureCollection>();
-
-        final FERequestResponse requestResponse = new FERequestResponse();
-
-        Filter filter = WFSFilter.initBBOXFilter(session.getLocation(), layer, false);
-        requestResponse.setFilter(filter);
-        requestResponse.setResponse(responseCollections);
-        requestResponse.setLocation(session.getLocation());
-
-        final String urlTemplate = layer.getURL();
-        final String requestTemplatePath = layer.getRequestTemplate();
-        final String recipePath = layer.getResponseTemplate();
-        final String username = layer.getUsername();
-        final String password = layer.getPassword();
-
-        final String srsName = session.getLocation().getSrs();
-        final String featureNs = layer.getFeatureNamespaceURI();
-        final String featurePrefix = layer.getFeatureNamespace();
-        final String featureName = layer.getFeatureElement();
-        final String WFSver = layer.getWFSVersion();
-        final String geomProp = layer.getGMLGeometryProperty();
-        final String geomNs = layer.getGeometryNamespaceURI();
-        final String maxCount = Integer.toString(layer.getMaxFeatures());
-        final Boolean resolveDepth = JSONHelper.getBooleanFromJSON(layer.getAttributes(), "resolveDepth", false);
-
-        JSONObject parseConfig = layer.getParseConfig();
-
-        final FERequestTemplate backendRequestTemplate = getRequestTemplate(requestTemplatePath);
-        if (backendRequestTemplate == null) {
-            log.error("NO Request Template available");
-            throw new TransportJobException("NO Request Template available [fe]",
-                    WFSExceptionHelper.ERROR_GETFEATURE_PAYLOAD_FAILED);
-        }
-
-        backendRequestTemplate.setRequestFeatures(srsName, featureNs, featurePrefix,
-                featureName, WFSver, geomProp, geomNs, maxCount, resolveDepth);
-
-        FeatureEngine featureEngine = null;
-        try {
-            featureEngine = getFeatureEngine(recipePath);
-        } catch (Exception e) {
-            throw new TransportJobException(e.getMessage(),
-                    e.getCause(),
-                    WFSExceptionHelper.ERROR_GETFEATURE_ENGINE_FAILED);
-        }
-
-        if (featureEngine == null) {
-            log.error("NO FeatureEngine available - maybe invalid wfs layer configuration");
-            throw new TransportJobException("NO FeatureEngine available - maybe invalid wfs layer configuration",
-                    WFSExceptionHelper.ERROR_GETFEATURE_ENGINE_FAILED);
-        }
-
-        // Is parsing based on parse config
-        if(parseConfig != null){
-            ELF_path_parse_worker worker = new ELF_path_parse_worker(parseConfig);
-            featureEngine.getRecipe().setParseWorker(worker);
-            WFS11_path_parse_worker wfs11worker = new WFS11_path_parse_worker(parseConfig);
-            featureEngine.getRecipe().setWFS11ParseWorker(wfs11worker);
-        }
-
-        final FeatureEngine engine = featureEngine;
-
-        log.debug("[fe] request template " + requestTemplatePath
-                + " instantiated as " + backendRequestTemplate);
-        log.debug("[fe] featureEngine " + recipePath + " instantiated as "
-                + featureEngine);
-
-        this.featureValuesList = resultsList;
-
-        try {
-            /* CRS */
-            //Axis order is x=lon y=lat for each projection in a OL Map
-            final CoordinateReferenceSystem crs = CRS.decode(session
-                    .getLocation().getSrs(), true);
-
-            final MathTransform transform = this.session.getLocation()
-                    .getTransformForClient(crs, true);
-
-            /* FeatureEngine InputProcessor */
-            final XMLInputProcessor inputProcessor = new StaxGMLInputProcessor();
-
-            final OutputProcessor outputProcessor = new FEOutputProcessor(
-                    resultsList, responseCollections, crs, requestResponse,
-                    selectedProperties, selectedPropertiesIndex, transform, geomProp);
-
-            /* Backend HTTP URI info */
-            FEUrl backendUrlInfo = getBackendURL(urlTemplate);
-
-            URL url = new URL(backendUrlInfo.url);
-
-            log.debug("[fe] using URL " + url);
-
-            /* Backend Proxy */
-            HttpHost backendProxy = null;
-
-            if (System.getProperty("http.proxyHost") != null
-                    && System.getProperty("http.proxyPort") != null) {
-
-                if (backendUrlInfo.proxy) {
-                    backendProxy = new HttpHost(
-                            System.getProperty("http.proxyHost"),
-                            Integer.valueOf(
-                                    System.getProperty("http.proxyPort"), 10),
-                            "http");
-                }
-            }
-            /* backendResponseHandler processes HTTP response */
-
-            FEResponseHandler backendResponseHandler = new FEResponseHandler(
-                    engine, inputProcessor, outputProcessor);
-
-            /* Backend HTTP Request */
-            HttpUriRequest backendUriRequest = null;
-            if (backendRequestTemplate.isPost) {
-                HttpPost httppost = new HttpPost(new URI(url.toExternalForm()));
-
-                StringBuffer params = new StringBuffer();
-
-                backendRequestTemplate.buildParams(params, type, layer,
-                        session, bounds, transform, crs);
-
-                log.debug("WFS POST Body " + params);
-
-                StringEntity entity = new StringEntity(params.toString());
-                httppost.setHeader(new BasicHeader("Content-Type",
-                        "text/xml; charset=UTF-8"));
-                httppost.setEntity(entity);
-                log.debug("[fe] HTTP POST " + httppost.getRequestLine());
-
-                backendUriRequest = httppost;
-
-            } else {
-
-                URIBuilder builder = new URIBuilder();
-                builder.setScheme(url.getProtocol());
-                builder.setHost(url.getHost());
-                builder.setPort(url.getPort());
-                builder.setPath(url.getPath());
-                backendRequestTemplate.buildParams(builder, type, layer,
-                        session, bounds, transform, crs);
-
-                HttpGet httpget = new HttpGet(builder.build());
-                log.debug("[fe] HTTP GET " + httpget.getRequestLine());
-
-                backendUriRequest = httpget;
-
-            }
-
-            /* Backend HTTP Executor */
-            final HttpParams httpParams = new BasicHttpParams();
-            HttpConnectionParams.setConnectionTimeout(httpParams, this.FE_READ_TIMEOUT_MS); //IOHelper.getConnectionTimeoutMs());
-            HttpConnectionParams.setSoTimeout(httpParams, this.FE_READ_TIMEOUT_MS);
-            DefaultHttpClient backendHttpClient = new DefaultHttpClient(httpParams);
-            try {
-                HttpHost backendHttpHost = new HttpHost(url.getHost(),
-                        url.getPort(), url.getProtocol());
-
-                UsernamePasswordCredentials backendCredentials = getCredentials(
-                        username, password);
-
-                BasicHttpContext backendLocalContext = null;
-                if (backendCredentials != null) {
-
-                    log.debug("[fe] using Credentials "
-                            + backendCredentials.getUserName() + " for " + url);
-
-                    backendHttpClient.getCredentialsProvider().setCredentials(
-                            new AuthScope(backendHttpHost.getHostName(),
-                                    backendHttpHost.getPort()),
-                            backendCredentials);
-
-                    // Create AuthCache instance
-                    AuthCache authCache = new BasicAuthCache();
-                    // Generate BASIC scheme object and add it to the local
-                    // auth cache
-                    BasicScheme basicAuth = new BasicScheme();
-                    authCache.put(backendHttpHost, basicAuth);
-
-                    backendLocalContext = new BasicHttpContext();
-                    backendLocalContext.setAttribute(ClientContext.AUTH_CACHE,
-                            authCache);
-                }
-
-                if (backendProxy != null) {
-                    log.debug("[fe] setting proxy for " + url);
-                    backendHttpClient.getParams().setParameter(
-                            ConnRoutePNames.DEFAULT_PROXY,
-
-                            backendProxy);
-                }
-
-                Boolean succee = backendLocalContext != null ? backendHttpClient
-                        .execute(backendUriRequest, backendResponseHandler,
-                                backendLocalContext) : backendHttpClient
-                        .execute(backendUriRequest, backendResponseHandler);
-
-                        log.debug("[fe] execute response " + succee + " for " + url);
-
-            } catch (HttpResponseException e) {
-                log.error("Error parsing response:", log.getCauseMessages(e));
-                log.debug(e);
-                throw new ServiceRuntimeException("Status code: " + Integer.toString(e.getStatusCode()) + " " + e.getMessage(),
-                        e.getCause(),
-                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
-            } catch (IOException e) {
-                log.error("Error fetching response:", log.getCauseMessages(e));
-                log.debug(e);
-                throw new ServiceRuntimeException(e.getMessage(),
-                        e.getCause(),
-                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
-            } catch (Exception e) {
-                log.error("Error fetching response:", log.getCauseMessages(e));
-                log.debug(e);
-                throw new ServiceRuntimeException(e.getMessage(),
-                        e.getCause(),
-                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
-            } finally {
-                // When HttpClient instance is no longer needed,
-                // shut down the connection manager to ensure
-                // immediate deallocation of all system resources
-                backendHttpClient.getConnectionManager().shutdown();
-                log.debug("[fe] http shutdown for " + url);
-            }
-
-        } catch (ServiceRuntimeException e) {
-            log.error(e);
-            throw new TransportJobException(e.getMessage(),
-                    e.getCause(),
-                    e.getMessageKey());
-        } catch (Exception e) {
-            log.error(e);
-            throw new TransportJobException(e.getMessage(),
-                    e.getCause(),
-                    WFSExceptionHelper.ERROR_FEATURE_PARSING);
-        } finally {
-            log.debug("[fe] end of process");
-        }
-
-        return requestResponse;
     }
 
 }
