@@ -16,14 +16,15 @@ import fi.nls.oskari.wfs.WFSParser;
 import fi.nls.oskari.wfs.pojo.WFSLayerStore;
 import fi.nls.oskari.wfs.util.HttpHelper;
 import fi.nls.oskari.wfs.extension.UserLayerProcessor;
-import org.geotools.feature.FeatureCollection;
+
+import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.filter.Filter;
 import org.opengis.referencing.operation.MathTransform;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.util.*;
 /**
@@ -68,66 +69,6 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
 
 
     /**
-     * Makes request
-     * Throws TransportJobException, if payload fails or post request response fails
-     *
-     * @param type
-     * @param layer
-     * @param session
-     * @param bounds
-     * @param transformService
-     * @return response
-     */
-    public RequestResponse request(JobType type, WFSLayerStore layer,
-            SessionStore session, List<Double> bounds,
-            MathTransform transformService) {
-        Reader response = null;
-        if (layer.getTemplateType() == null) { // default
-            String payload = WFSCommunicator.createRequestPayload(type, layer,
-                    session, bounds, transformService);
-            log.debug("...WFS / Request data "+ layer.getURL() + "\n" + payload + "\n");
-            try {
-                response = HttpHelper.postRequestReader(layer.getURL(), "",
-                        payload, layer.getUsername(), layer.getPassword(), true);
-            }
-            catch (ServiceRuntimeException e){
-                throw new TransportJobException(e.getMessage(),
-                        e.getCause(),
-                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
-            }
-        } else {
-            log.debug(
-                    "Failed to make a request because of undefined layer type "+
-                    layer.getTemplateType());
-        }
-
-        WFSRequestResponse requestResponse = new WFSRequestResponse();
-        requestResponse.setResponse(response);
-
-        return requestResponse;
-    }
-
-    /**
-     * Parses response to features
-     *
-     * @param layer
-     * @return features
-     */
-    public FeatureCollection<SimpleFeatureType, SimpleFeature> response(
-            WFSLayerStore layer, RequestResponse requestResponse) {
-        Reader response = ((WFSRequestResponse) requestResponse).getResponse();
-        FeatureCollection<SimpleFeatureType, SimpleFeature> features = WFSCommunicator.parseSimpleFeatures(response, layer);
-
-        if (UserLayerProcessor.isProcessable(layer)) {
-			features = UserLayerProcessor.process(features, layer);
-        }
-
-        IOHelper.close(response);
-
-        return features;
-    }
-
-    /**
      * Unique key definition
      */
 	@Override
@@ -143,20 +84,16 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
 	 *         otherwise.
 	 */
     protected boolean requestHandler(List<Double> bounds) {
-
         // make a request
-        RequestResponse response = request(type, layer, session, bounds, transformService);
-        boolean success = false;
+        Reader response = request(type, layer, session, bounds, transformService);
+        // request failed
+        if (response == null) {
+            log.warn("Request failed for layer: ",layer.getLayerName(), "id: ", layer.getLayerId());
+            throw new TransportJobException("Request failed for layer: " + layer.getLayerName() + "id: " + layer.getLayerId(),
+                    WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
+        }
 
         try {
-            // request failed
-            if(response == null) {
-                log.warn("Request failed for layer: ",layer.getLayerName(), "id: ", layer.getLayerId());
-                throw new TransportJobException("Request failed for layer: " + layer.getLayerName() + "id: " + layer.getLayerId(),
-                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
-
-            }
-
             // parse response, throws an exception on failure
             this.features = response(layer, response);
             final Map<String, Object> output = createCommonResponse();
@@ -187,19 +124,67 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
                 this.service.addResults(session.getClient(), ResultProcessor.CHANNEL_FEATURE, output);
             }
 
-            success = true;
             log.debug("Features count", this.features.size());
+            return true;
         } finally {
-            if( response != null ) {
-                try {
-                    response.flush();
-                } catch( java.io.IOException e) {
-                    success = false;
-                }
+            try {
+                response.close();
+            } catch (IOException e) {
+                return false;
             }
         }
+    }
 
-        return success;
+    /**
+     * Makes request
+     * Throws TransportJobException, if payload fails or post request response fails
+     *
+     * @param type
+     * @param layer
+     * @param session
+     * @param bounds
+     * @param transformService
+     * @return response
+     */
+    public Reader request(JobType type, WFSLayerStore layer,
+            SessionStore session, List<Double> bounds,
+            MathTransform transformService) {
+        if (layer.getTemplateType() != null) {
+            log.debug("Failed to make a request because of undefined layer type", layer.getTemplateType());
+            return null;
+        }
+        // default
+        String payload = WFSCommunicator.createRequestPayload(type, layer,
+                session, bounds, transformService);
+        log.debug("...WFS / Request data "+ layer.getURL() + "\n" + payload + "\n");
+        try {
+            return HttpHelper.postRequestReader(layer.getURL(), "",
+                    payload, layer.getUsername(), layer.getPassword(), true);
+        }
+        catch (ServiceRuntimeException e){
+            throw new TransportJobException(e.getMessage(),
+                    e.getCause(),
+                    WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
+        }
+    }
+
+    /**
+     * Parses response to features
+     *
+     * @param layer
+     * @return features
+     */
+    public SimpleFeatureCollection response(
+            WFSLayerStore layer, Reader response) {
+        SimpleFeatureCollection features = WFSCommunicator.parseSimpleFeatures(response, layer);
+    
+        if (UserLayerProcessor.isProcessable(layer)) {
+    		features = UserLayerProcessor.process(features, layer);
+        }
+    
+        IOHelper.close(response);
+    
+        return features;
     }
 
     /**
@@ -397,5 +382,5 @@ public class WFSMapLayerJob extends OWSMapLayerJob {
                 "," + bbox[3] +
                 "&" + OUTPUT_IMAGE_ZOOM + "=" + this.session.getLocation().getZoom();
     }
-
+    
 }

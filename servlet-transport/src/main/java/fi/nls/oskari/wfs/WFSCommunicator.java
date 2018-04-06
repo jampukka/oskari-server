@@ -12,10 +12,8 @@ import fi.nls.oskari.wfs.util.XMLHelper;
 import fi.nls.oskari.work.JobType;
 import org.apache.axiom.om.*;
 import org.apache.axiom.om.impl.builder.StAXOMBuilder;
-import org.geotools.feature.FeatureCollection;
+import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.xml.Parser;
-import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.referencing.operation.MathTransform;
 
 import java.io.Reader;
@@ -183,8 +181,7 @@ public class WFSCommunicator {
 	 * @param layer
 	 * @return simple features
 	 */
-	@SuppressWarnings("unchecked")
-	public static FeatureCollection<SimpleFeatureType, SimpleFeature> parseSimpleFeatures(
+	public static SimpleFeatureCollection parseSimpleFeatures(
 	        Reader response,
             final WFSLayerStore layer) {
 		Parser parser = null;
@@ -199,9 +196,8 @@ public class WFSCommunicator {
 		Object obj = null;
 		try {
 			obj = parser.parse(response);
-            if(obj instanceof FeatureCollection) {
-                FeatureCollection<SimpleFeatureType, SimpleFeature> featureCollection = (FeatureCollection<SimpleFeatureType, SimpleFeature>) obj;
-                return featureCollection;
+            if(obj instanceof SimpleFeatureCollection) {
+                return (SimpleFeatureCollection) obj;
             }
             if(!(obj instanceof Number)) {
                 // obj can be 0 if no hits

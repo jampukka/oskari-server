@@ -18,15 +18,15 @@ import fi.nls.oskari.wfs.WFSParser;
 import fi.nls.oskari.wfs.pojo.WFSLayerStore;
 import fi.nls.oskari.wfs.util.HttpHelper;
 import fi.nls.oskari.work.*;
-import org.geotools.feature.FeatureCollection;
-import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
+
+import org.geotools.data.simple.SimpleFeatureCollection;
 import org.opengis.referencing.operation.MathTransform;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +37,6 @@ import java.util.Map;
 public class ArcGisMapLayerJob extends OWSMapLayerJob {
 
     private static final Logger log = LogFactory.getLogger(ArcGisMapLayerJob.class);
-    private static final List<List<Object>> EMPTY_LIST = new ArrayList();
 
     public static final String OUTPUT_LAYER_ID = "layerId";
     public static final String OUTPUT_ONCE = "once";
@@ -54,11 +53,9 @@ public class ArcGisMapLayerJob extends OWSMapLayerJob {
     // process information
     ResultProcessor service;
     private ArcGisLayerStore arcGisLayer;
-    private ArcGisLayerStore arcGisLayerScaled;
     private List<ArcGisLayerStore> arcGisLayers = new ArrayList<ArcGisLayerStore>();
 
     private MathTransform transformService;
-    private MathTransform transformClient;
     private ArrayList<ArcGisFeature> features;
     private List<List<Object>> featureValuesList;
     private List<List<Object>> geomValuesList;
@@ -102,19 +99,6 @@ public class ArcGisMapLayerJob extends OWSMapLayerJob {
         } else {
             log.warn("Failed to make a request because of undefined layer type", layer.getTemplateType());
         }
-
-        return response;
-    }
-
-    private Reader sendIdentifyRequest(WFSLayerStore layer, List<ArcGisLayerStore> layers,
-                                               SessionStore session, List<Double> bounds,
-                                               String token) {
-        Reader response = null;
-
-        String payload = ArcGisCommunicator.createIdentifyRequestPayload(layers, session, bounds, token);
-        String url = layer.getURL() + "/identify?";
-        log.debug("Request data\n", url, "\n", payload);
-        response = HttpHelper.getRequestReader(url + payload, "", layer.getUsername(), layer.getPassword());
 
         return response;
     }
@@ -232,7 +216,6 @@ public class ArcGisMapLayerJob extends OWSMapLayerJob {
         }
 
         this.arcGisLayers = getArcGisLayersDependingOnScale();
-        this.arcGisLayerScaled = this.arcGisLayers.get(0);
 
         if (this.type == JobType.NORMAL) { // tiles for grid
 
@@ -351,7 +334,7 @@ public class ArcGisMapLayerJob extends OWSMapLayerJob {
             }
         } else if (this.type == JobType.MAP_CLICK) {
             if (!this.requestHandler(null)) {
-                this.sendWFSFeatures(EMPTY_LIST, ResultProcessor.CHANNEL_MAP_CLICK);
+                this.sendWFSFeatures(Collections.emptyList(), ResultProcessor.CHANNEL_MAP_CLICK);
                 return "success";
             }
             this.featuresHandler();
@@ -361,7 +344,7 @@ public class ArcGisMapLayerJob extends OWSMapLayerJob {
                 this.sendWFSFeatures(this.featureValuesList, ResultProcessor.CHANNEL_MAP_CLICK);
             } else {
                 log.debug("No feature data!");
-                this.sendWFSFeatures(EMPTY_LIST, ResultProcessor.CHANNEL_MAP_CLICK);
+                this.sendWFSFeatures(Collections.emptyList(), ResultProcessor.CHANNEL_MAP_CLICK);
             }
         } else if (this.type == JobType.GEOJSON) {
             if (!this.requestHandler(null)) {
@@ -408,9 +391,8 @@ public class ArcGisMapLayerJob extends OWSMapLayerJob {
      * @param layer
      * @return features
      */
-    public FeatureCollection<SimpleFeatureType, SimpleFeature> response(
-            WFSLayerStore layer, RequestResponse requestResponse) {
-        Reader response = ((WFSRequestResponse) requestResponse).getResponse();
+    public SimpleFeatureCollection response(
+            WFSLayerStore layer, Reader response) {
         features = ArcGisCommunicator.parseFeatures(response, layer);
         //FeatureCollection<SimpleFeatureType, SimpleFeature> features = WFSCommunicator.parseSimpleFeatures(response, layer);
         IOHelper.close(response);
@@ -637,8 +619,4 @@ public class ArcGisMapLayerJob extends OWSMapLayerJob {
         imageParsingFailed(ERROR_REST_IMAGE_PARSING);
     }
 
-    @Override
-    public RequestResponse request(JobType type, WFSLayerStore layer, SessionStore session, List<Double> bounds, MathTransform transformService) {
-        throw new RuntimeException("Not implemented!");
-    }
 }

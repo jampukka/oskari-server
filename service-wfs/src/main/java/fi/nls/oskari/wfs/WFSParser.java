@@ -10,8 +10,8 @@ import org.apache.axiom.om.OMAttribute;
 import org.apache.axiom.om.OMElement;
 import org.apache.axiom.om.impl.builder.StAXOMBuilder;
 import org.geotools.data.DataUtilities;
+import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.feature.DefaultFeatureCollection;
-import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.SchemaException;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.geometry.jts.JTS;
@@ -73,7 +73,7 @@ public class WFSParser {
      * 
      * @return feature collection
      */
-	public FeatureCollection<SimpleFeatureType, SimpleFeature> parse() {
+	public SimpleFeatureCollection parse() {
         if(this.response == null || this.layer == null) {
         	return null;
         }
@@ -422,7 +422,7 @@ public class WFSParser {
      * @param features
      * @return simple features
      */
-    public static FeatureCollection<SimpleFeatureType, SimpleFeature> dataToSimpleFeatures(String types, List<List<Object>> features) {
+    public static SimpleFeatureCollection dataToSimpleFeatures(String types, List<List<Object>> features) {
         DefaultFeatureCollection featureCollection = null;
         SimpleFeatureType type = null;
         try {
@@ -442,6 +442,6 @@ public class WFSParser {
             )
             );
         }
-        return (FeatureCollection<SimpleFeatureType, SimpleFeature>) featureCollection;
+        return featureCollection;
     }
 }

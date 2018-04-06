@@ -2,14 +2,12 @@ package fi.nls.oskari.work.fe;
 
 import fi.nls.oskari.fe.iri.Resource;
 import fi.nls.oskari.pojo.Location;
-import fi.nls.oskari.work.RequestResponse;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.opengis.filter.Filter;
 
-import java.io.IOException;
 import java.util.Map;
 
-public class FERequestResponse implements RequestResponse {
+public class FERequestResponse {
     Map<Resource, SimpleFeatureCollection> response;
     private Filter filter;
     Location location;
@@ -34,7 +32,6 @@ public class FERequestResponse implements RequestResponse {
 
     public void setLocation(Location location) {
         this.location = location;
-
     }
 
     public Location getLocation() {
@@ -49,8 +46,4 @@ public class FERequestResponse implements RequestResponse {
         this.featureIri = featureIri;
     }
     
-    public void flush() throws IOException {
-        
-    }
-
 }

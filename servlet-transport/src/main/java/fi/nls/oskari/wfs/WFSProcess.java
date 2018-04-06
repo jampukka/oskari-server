@@ -9,15 +9,15 @@ import fi.nls.oskari.pojo.Tile;
 import fi.nls.oskari.wfs.pojo.WFSLayerStore;
 import fi.nls.oskari.work.JobHelper;
 import fi.nls.oskari.work.JobType;
-import fi.nls.oskari.work.RequestResponse;
 import fi.nls.oskari.work.WFSMapLayerJob;
-import org.geotools.feature.FeatureCollection;
-import org.geotools.feature.FeatureIterator;
+
+import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.data.simple.SimpleFeatureIterator;
 import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.referencing.operation.MathTransform;
 
 import java.awt.image.BufferedImage;
+import java.io.Reader;
 import java.util.Arrays;
 import java.util.List;
 
@@ -64,15 +64,14 @@ public class WFSProcess {
         // make request
         // TODO transportService == null
         WFSMapLayerJob job = new WFSMapLayerJob(null, processType, store, layer);
-        
-        RequestResponse res = job.request(processType, layer, store, bounds, transformService);
+        Reader res = job.request(processType, layer, store, bounds, transformService);
         if(res == null) {
             log.warn("Request failed for layer", layer.getLayerId());
             return null;
         }
 
         // parse response
-        FeatureCollection<SimpleFeatureType, SimpleFeature> features = job.response(layer, res);
+        SimpleFeatureCollection features = job.response(layer, res);
         if(features == null || features.size() == 0) {
             log.warn("No features", layer.getLayerId());
             return null;
@@ -81,7 +80,7 @@ public class WFSProcess {
         log.debug("Features count", features.size());
 
         // edit feature geometries
-        FeatureIterator<SimpleFeature> featuresIter =  features.features();
+        SimpleFeatureIterator featuresIter =  features.features();
         while(featuresIter.hasNext()) {
             SimpleFeature feature = featuresIter.next();
             WFSParser.getFeatureGeometry(feature, layer.getGMLGeometryProperty(), transformClient);

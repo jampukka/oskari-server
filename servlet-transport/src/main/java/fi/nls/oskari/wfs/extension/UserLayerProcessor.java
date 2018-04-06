@@ -4,9 +4,9 @@ import fi.nls.oskari.service.ServiceRuntimeException;
 import fi.nls.oskari.wfs.pojo.WFSLayerStore;
 import fi.nls.oskari.work.WFSMapLayerJob;
 
+import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.feature.DefaultFeatureCollection;
-import org.geotools.feature.FeatureCollection;
-import org.geotools.feature.FeatureIterator;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.opengis.feature.Property;
@@ -43,8 +43,8 @@ public class UserLayerProcessor {
     /**
      * Parse features' property_json attribute and add parsed attributes to features
      */
-    public static FeatureCollection<SimpleFeatureType, SimpleFeature> process(FeatureCollection<SimpleFeatureType, SimpleFeature> features, WFSLayerStore layer) {
-        try (FeatureIterator<SimpleFeature> iterator = features.features()) {
+    public static SimpleFeatureCollection process(SimpleFeatureCollection features, WFSLayerStore layer) {
+        try (SimpleFeatureIterator iterator = features.features()) {
             DefaultFeatureCollection result = null;
             SimpleFeatureBuilder builder = null;
             while (iterator.hasNext()) {

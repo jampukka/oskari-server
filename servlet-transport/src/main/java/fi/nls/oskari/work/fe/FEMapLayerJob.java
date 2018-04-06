@@ -11,11 +11,9 @@ import fi.nls.oskari.fe.iri.Resource;
 import fi.nls.oskari.fe.output.OutputProcessor;
 import fi.nls.oskari.fi.rysp.generic.WFS11_path_parse_worker;
 import fi.nls.oskari.map.geometry.ProjectionHelper;
-import fi.nls.oskari.pojo.GeoJSONFilter;
 import fi.nls.oskari.pojo.SessionStore;
 import fi.nls.oskari.service.ServiceRuntimeException;
 import fi.nls.oskari.transport.TransportJobException;
-import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.util.JSONHelper;
 import fi.nls.oskari.wfs.WFSExceptionHelper;
 import fi.nls.oskari.wfs.WFSFilter;
@@ -24,13 +22,11 @@ import fi.nls.oskari.wfs.WFSParser;
 import fi.nls.oskari.wfs.pojo.WFSLayerStore;
 import fi.nls.oskari.work.JobType;
 import fi.nls.oskari.work.OWSMapLayerJob;
-import fi.nls.oskari.work.RequestResponse;
 import fi.nls.oskari.work.ResultProcessor;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.AuthCache;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
@@ -48,33 +44,23 @@ import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.BasicHttpContext;
 import org.geotools.data.simple.SimpleFeatureCollection;
-import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.referencing.CRS;
 import org.geotools.styling.Style;
 import org.json.JSONObject;
 import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.filter.Filter;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.cs.AxisDirection;
 import org.opengis.referencing.operation.MathTransform;
-import org.opengis.referencing.operation.TransformException;
-import org.xml.sax.SAXException;
 
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.xpath.XPathExpressionException;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class FEMapLayerJob extends OWSMapLayerJob {
 
@@ -135,7 +121,7 @@ public class FEMapLayerJob extends OWSMapLayerJob {
         // For now we just want highlight to NOT send a feature.
         if(this.type != JobType.HIGHLIGHT) {
             for (List<Object> feature : featureValuesList) {
-                    this.sendWFSFeature(feature);
+                this.sendWFSFeature(feature);
             }
         }
 
@@ -178,14 +164,219 @@ public class FEMapLayerJob extends OWSMapLayerJob {
                 this.layer.getFeatureParamsLocales(this.session.getLanguage()));
     }
 
+    private FeatureEngine getFeatureEngine(String recipePath)
+            throws InstantiationException, IllegalAccessException,
+            ClassNotFoundException {
+        return FEEngineManager.getEngineForRecipe(recipePath);
+    }
+
+    /**
+     * builds the Backend URL and adds proxy from System properties
+     * 
+     * @param urlTemplate
+     * @return
+     */
+    protected FEUrl getBackendURL(String urlTemplate) {
+
+        String url = null;
+        boolean isProxy = false;
+
+        if (System.getProperty("http.proxyHost") != null
+                && System.getProperty("http.proxyPort") != null) {
+
+            if (urlTemplate.indexOf('|') != -1) {
+                url = urlTemplate.substring(0, urlTemplate.indexOf('|'));
+                isProxy = true;
+
+            } else {
+                url = urlTemplate;
+                isProxy = true;
+            }
+
+            if (url.charAt(0) == '!') {
+                url = url.substring(1);
+                isProxy = false;
+            }
+
+        } else {
+            if (urlTemplate.indexOf('|') != -1) {
+                url = urlTemplate.substring(urlTemplate.indexOf('|') + 1);
+                isProxy = false;
+            } else {
+                url = urlTemplate;
+                isProxy = false;
+            }
+        }
+
+        return new FEUrl(url, isProxy);
+
+    }
+
+    /**
+     * builds credentials for HTTP request
+     * 
+     * @param username
+     * @param password
+     * @return
+     */
+    protected UsernamePasswordCredentials getCredentials(String username,
+            String password) {
+        if (username == null || username.isEmpty()) {
+            return null;
+        }
+        if (password == null || password.isEmpty()) {
+            return null;
+        }
+        log.debug("[fe] building credentials for " + this.layerId + " as "
+                + username);
+        return new UsernamePasswordCredentials(username, password);
+    }
+
+    /**
+     * Builds Request Template
+     * 
+     * @param requestTemplatePath
+     * @return
+     */
+    protected FERequestTemplate getRequestTemplate(String requestTemplatePath) {
+
+        if (requestTemplatePath
+                .equals("oskari-feature-engine:QueryArgsBuilder_KTJkii_LEGACY")) {
+            log.debug("[fe] using specific GET request template for "
+                    + this.layerId + " is " + requestTemplatePath);
+            return new FERequestTemplate(new KTJRestQueryArgsBuilder());
+        } else if (requestTemplatePath
+                .equals("oskari-feature-engine:QueryArgsBuilder_WFS_GET")) {
+            log.debug("[fe] using GET WFS request template for " + this.layerId
+                    + " is " + requestTemplatePath);
+            return new FERequestTemplate(new FEWFSGetQueryArgsBuilder());
+        } else {
+            log.debug("[fe] using POST WFS request template for "
+                    + this.layerId + " is " + requestTemplatePath);
+            return new FERequestTemplate(requestTemplatePath);
+        }
+
+    }
+
+    /**
+     * Looks up (cached) SLD styling for WFS
+     * 
+     * @return
+     */
+    protected Style getSLD(String geomPropertyname, String styleName) {
+        Optional<WFSSLDStyle> sldStyle = this.layer.getSLDStyles().stream()
+                .filter(s -> styleName.equals(s.getName()))
+                .findFirst();
+
+        String sldPath = sldStyle.map(WFSSLDStyle::getSLDStyle)
+                .orElse(DEFAULT_FE_SLD_STYLE_PATH + geomPropertyname.toLowerCase() + ".xml");
+        String sldName = sldStyle.map(WFSSLDStyle::getName)
+                .orElse(null);
+
+        return FEStyledLayerDescriptorManager.getSLD(sldName, sldPath);
+    }
+
+    @Override
+    public boolean runPropertyFilterJob() {
+        return runUnknownJob();
+    }
+
+    /**
+     * Checks if enough information for running the task type
+     *
+     * @return <code>true</code> if enough information for type;
+     *         <code>false</code> otherwise.
+     */
+    @Override
+    public boolean hasValidParams() {
+        // FE doesn't handle PROPERTY_FILTER
+        if(this.type == JobType.PROPERTY_FILTER) {
+            return false;
+        }
+        return super.hasValidParams();
+    }
+
+    protected boolean requestHandler(List<Double> bounds) {
+        // make a request
+        FERequestResponse response = request(bounds);
+
+        if (response == null) {
+            // request failed
+            log.debug("Request failed for layer" + layer.getLayerId());
+            log.debug(PROCESS_ENDED + getKey());
+            throw new ServiceRuntimeException("Request failed for layer: " + layer.getLayerName() + "id: " + layer.getLayerId(),
+                    WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
+        }
+
+        this.features = response.getResponse().get(response.getFeatureIri());
+        if (this.features == null) {
+            // parsing failed
+            log.debug("Parsing failed for layer " + this.layerId);
+            log.debug(PROCESS_ENDED + getKey());
+            throw new ServiceRuntimeException("Request failed for layer: " + layer.getLayerName(),
+                    WFSExceptionHelper.ERROR_FEATURE_PARSING);
+        }
+
+        Map<String, Object> output = createCommonResponse();
+        try {
+            // Swap XY in feature geometry, if reverseXY setup in layer attributes
+            if(layer.isReverseXY(session.getLocation().getSrs())){
+                ProjectionHelper.swapGeometryXY(this.features);
+            }
+
+            // 0 features found - send size
+            if (this.type == JobType.MAP_CLICK && this.features.size() == 0) {
+                log.debug("Empty result for map click" + this.layerId);
+                output.put(OUTPUT_FEATURES, "empty");
+                output.put(OUTPUT_KEEP_PREVIOUS, this.session.isKeepPrevious());
+                this.service.addResults(session.getClient(),
+                        ResultProcessor.CHANNEL_MAP_CLICK, output);
+                log.debug(PROCESS_ENDED + getKey());
+                return false;
+            } else if (this.type == JobType.GEOJSON && this.features.size() == 0) {
+                log.debug("Empty result for filter" + this.layerId);
+                output.put(OUTPUT_FEATURES, "empty");
+                this.service.addResults(session.getClient(),
+                        ResultProcessor.CHANNEL_FILTER, output);
+                log.debug(PROCESS_ENDED + getKey());
+                return false;
+            } else {
+                if (this.features.size() == 0) {
+                    log.debug("Empty result" + this.layerId);
+                    output.put(OUTPUT_FEATURE, "empty");
+                    this.service.addResults(session.getClient(),
+                            ResultProcessor.CHANNEL_FEATURE, output);
+                    log.debug(PROCESS_ENDED + getKey());
+                    return false;
+                } else if (this.features.size() == layer.getMaxFeatures()) {
+                    log.debug("Max feature result" + this.layerId);
+                    output.put(OUTPUT_FEATURE, "max");
+                    this.service.addResults(session.getClient(),
+                            ResultProcessor.CHANNEL_FEATURE, output);
+                }
+            }
+
+            log.debug("Features count" + this.features.size());
+        } catch (ServiceRuntimeException e) {
+            log.error(e);
+            throw new TransportJobException(e.getMessage(),
+                    e.getCause(),
+                    e.getMessageKey());
+        } catch (Exception ee) {
+            log.debug("exception: " + ee);
+            throw new TransportJobException(ee.getMessage(),
+                    ee.getCause(),
+                    WFSExceptionHelper.ERROR_FEATURE_PARSING);
+        }
+
+        return true;
+    }
+
     /**
      * Builds the WFS request from template. Issues HTTP request with WFS
      * request Processes WFS response with 'feature-engine' i.e Groovy scripts.
      */
-    public RequestResponse request(final JobType type, final WFSLayerStore layer,
-            final SessionStore session, final List<Double> bounds,
-            final MathTransform transformService) {
-
+    private FERequestResponse request(List<Double> bounds) {
         final ArrayList<List<Object>> resultsList = new ArrayList<List<Object>>();
         final Map<Resource, SimpleFeatureCollection> responseCollections = new HashMap<Resource, SimpleFeatureCollection>();
 
@@ -383,7 +574,7 @@ public class FEMapLayerJob extends OWSMapLayerJob {
                                 backendLocalContext) : backendHttpClient
                         .execute(backendUriRequest, backendResponseHandler);
 
-                log.debug("[fe] execute response " + succee + " for " + url);
+                        log.debug("[fe] execute response " + succee + " for " + url);
 
             } catch (HttpResponseException e) {
                 log.error("Error parsing response:", log.getCauseMessages(e));
@@ -426,261 +617,6 @@ public class FEMapLayerJob extends OWSMapLayerJob {
         }
 
         return requestResponse;
-    }
-
-    private FeatureEngine getFeatureEngine(String recipePath)
-            throws InstantiationException, IllegalAccessException,
-            ClassNotFoundException {
-        return FEEngineManager.getEngineForRecipe(recipePath);
-    }
-
-    /**
-     * builds the Backend URL and adds proxy from System properties
-     * 
-     * @param urlTemplate
-     * @return
-     */
-    protected FEUrl getBackendURL(String urlTemplate) {
-
-        String url = null;
-        boolean isProxy = false;
-
-        if (System.getProperty("http.proxyHost") != null
-                && System.getProperty("http.proxyPort") != null) {
-
-            if (urlTemplate.indexOf('|') != -1) {
-                url = urlTemplate.substring(0, urlTemplate.indexOf('|'));
-                isProxy = true;
-
-            } else {
-                url = urlTemplate;
-                isProxy = true;
-            }
-
-            if (url.charAt(0) == '!') {
-                url = url.substring(1);
-                isProxy = false;
-            }
-
-        } else {
-            if (urlTemplate.indexOf('|') != -1) {
-                url = urlTemplate.substring(urlTemplate.indexOf('|') + 1);
-                isProxy = false;
-            } else {
-                url = urlTemplate;
-                isProxy = false;
-            }
-        }
-
-        return new FEUrl(url, isProxy);
-
-    }
-
-    /**
-     * builds credentials for HTTP request
-     * 
-     * @param username
-     * @param password
-     * @return
-     */
-    protected UsernamePasswordCredentials getCredentials(String username,
-            String password) {
-        if (username == null || username.isEmpty()) {
-            return null;
-        }
-        if (password == null || password.isEmpty()) {
-            return null;
-        }
-        log.debug("[fe] building credentials for " + this.layerId + " as "
-                + username);
-        return new UsernamePasswordCredentials(username, password);
-    }
-
-    /**
-     * Builds Request Template
-     * 
-     * @param requestTemplatePath
-     * @return
-     */
-    protected FERequestTemplate getRequestTemplate(String requestTemplatePath) {
-
-        if (requestTemplatePath
-                .equals("oskari-feature-engine:QueryArgsBuilder_KTJkii_LEGACY")) {
-            log.debug("[fe] using specific GET request template for "
-                    + this.layerId + " is " + requestTemplatePath);
-            return new FERequestTemplate(new KTJRestQueryArgsBuilder());
-        } else if (requestTemplatePath
-                .equals("oskari-feature-engine:QueryArgsBuilder_WFS_GET")) {
-            log.debug("[fe] using GET WFS request template for " + this.layerId
-                    + " is " + requestTemplatePath);
-            return new FERequestTemplate(new FEWFSGetQueryArgsBuilder());
-        } else {
-            log.debug("[fe] using POST WFS request template for "
-                    + this.layerId + " is " + requestTemplatePath);
-            return new FERequestTemplate(requestTemplatePath);
-        }
-
-    }
-
-    /**
-     * Looks up (cached) SLD styling for WFS
-     * 
-     * @return
-     */
-    protected Style getSLD(String geomPropertyname, String styleName) {
-
-        List<WFSSLDStyle> sldStyles = this.layer.getSLDStyles();
-
-        WFSSLDStyle sldStyle = null;
-        for (WFSSLDStyle s : sldStyles) {
-            if (styleName.equals(s.getName())) {
-                log.debug("[fe] SLD for  " + this.layerId + " FE style found");
-                sldStyle = s;
-                break;
-            }
-        }
-        String sldPath = null;
-        String sldName = null;
-        if (sldStyle == null) {
-            log.debug("[fe] SLD for  " + this.layerId + " not found - use default");
-            sldPath = this.DEFAULT_FE_SLD_STYLE_PATH+geomPropertyname.toLowerCase()+".xml";
-        }
-        else {
-            sldPath = sldStyle.getSLDStyle();
-            sldName = sldStyle.getName();
-
-        }
-
-
-
-        Style sld = FEStyledLayerDescriptorManager.getSLD(sldName, sldPath);
-
-        return sld;
-
-    }
-
-    @Override
-    public FeatureCollection<SimpleFeatureType, SimpleFeature> response(
-            WFSLayerStore layer, RequestResponse requestResponse) {
-        FeatureCollection<SimpleFeatureType, SimpleFeature> responseFeatures = ((FERequestResponse) requestResponse)
-                .getResponse().get(
-                        ((FERequestResponse) requestResponse).getFeatureIri());
-        return responseFeatures;
-    }
-
-    @Override
-    public boolean runPropertyFilterJob() {
-        return runUnknownJob();
-    }
-
-    /**
-     * Checks if enough information for running the task type
-     *
-     * @return <code>true</code> if enough information for type;
-     *         <code>false</code> otherwise.
-     */
-    @Override
-    public boolean hasValidParams() {
-        // FE doesn't handle PROPERTY_FILTER
-        if(this.type == JobType.PROPERTY_FILTER) {
-            return false;
-        }
-        return super.hasValidParams();
-    }
-
-    /**
-     * Makes request and parses response to features
-     *
-     * @param bounds
-     * @return <code>true</code> if thread should continue; <code>false</code>
-     *         otherwise.
-     */
-    /**
-     * Makes request and parses response to features
-     *
-     * @param bounds
-     * @return <code>true</code> if thread should continue; <code>false</code>
-     *         otherwise.
-     */
-    protected boolean requestHandler(List<Double> bounds) {
-
-        // make a request
-        RequestResponse response = request(type, layer, session, bounds,
-                transformService);
-
-        Map<String, Object> output = createCommonResponse();
-        try {
-
-            // request failed
-            if (response == null) {
-                log.debug("Request failed for layer" + layer.getLayerId());
-                log.debug(PROCESS_ENDED + getKey());
-                throw new ServiceRuntimeException("Request failed for layer: " + layer.getLayerName() + "id: " + layer.getLayerId(),
-                        WFSExceptionHelper.ERROR_GETFEATURE_POSTREQUEST_FAILED);
-            }
-
-            // parse response
-            this.features = response(layer, response);
-
-            // parsing failed
-            if (this.features == null) {
-                log.debug("Parsing failed for layer " + this.layerId);
-                log.debug(PROCESS_ENDED + getKey());
-                throw new ServiceRuntimeException("Request failed for layer: " + layer.getLayerName(),
-                        WFSExceptionHelper.ERROR_FEATURE_PARSING);
-            }
-
-            // Swap XY in feature geometry, if reverseXY setup in layer attributes
-            if(layer.isReverseXY(session.getLocation().getSrs())){
-                ProjectionHelper.swapGeometryXY(this.features);
-            }
-
-            // 0 features found - send size
-            if (this.type == JobType.MAP_CLICK && this.features.size() == 0) {
-                log.debug("Empty result for map click" + this.layerId);
-                output.put(OUTPUT_FEATURES, "empty");
-                output.put(OUTPUT_KEEP_PREVIOUS, this.session.isKeepPrevious());
-                this.service.addResults(session.getClient(),
-                        ResultProcessor.CHANNEL_MAP_CLICK, output);
-                log.debug(PROCESS_ENDED + getKey());
-                return false;
-            } else if (this.type == JobType.GEOJSON && this.features.size() == 0) {
-                log.debug("Empty result for filter" + this.layerId);
-                output.put(OUTPUT_FEATURES, "empty");
-                this.service.addResults(session.getClient(),
-                        ResultProcessor.CHANNEL_FILTER, output);
-                log.debug(PROCESS_ENDED + getKey());
-                return false;
-            } else {
-                if (this.features.size() == 0) {
-                    log.debug("Empty result" + this.layerId);
-                    output.put(OUTPUT_FEATURE, "empty");
-                    this.service.addResults(session.getClient(),
-                            ResultProcessor.CHANNEL_FEATURE, output);
-                    log.debug(PROCESS_ENDED + getKey());
-                    return false;
-                } else if (this.features.size() == layer.getMaxFeatures()) {
-                    log.debug("Max feature result" + this.layerId);
-                    output.put(OUTPUT_FEATURE, "max");
-                    this.service.addResults(session.getClient(),
-                            ResultProcessor.CHANNEL_FEATURE, output);
-                }
-            }
-
-            log.debug("Features count" + this.features.size());
-        } catch (ServiceRuntimeException e) {
-            log.error(e);
-            throw new TransportJobException(e.getMessage(),
-                    e.getCause(),
-                    e.getMessageKey());
-        } catch (Exception ee) {
-            log.debug("exception: " + ee);
-            throw new TransportJobException(ee.getMessage(),
-                    ee.getCause(),
-                    WFSExceptionHelper.ERROR_FEATURE_PARSING);
-        }
-
-        return true;
     }
 
 }

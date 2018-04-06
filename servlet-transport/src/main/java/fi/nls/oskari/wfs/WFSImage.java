@@ -10,7 +10,7 @@ import fi.nls.oskari.pojo.WFSCustomStyleStore;
 import fi.nls.oskari.util.IOHelper;
 import fi.nls.oskari.wfs.pojo.WFSLayerStore;
 import org.apache.commons.codec.binary.Base64;
-import org.geotools.feature.FeatureCollection;
+import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.map.FeatureLayer;
 import org.geotools.map.Layer;
@@ -24,8 +24,6 @@ import org.geotools.styling.Style;
 import org.geotools.styling.StyledLayerDescriptor;
 import org.geotools.xml.Configuration;
 import org.geotools.xml.Parser;
-import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import javax.imageio.ImageIO;
@@ -63,7 +61,7 @@ public class WFSImage {
     private Style style;
 
     private Location location; // location of the tile (modified if not map)
-    private FeatureCollection<SimpleFeatureType, SimpleFeature> features;
+    private SimpleFeatureCollection features;
     private int imageWidth = 0;
     private int imageHeight = 0;
     private double bufferSize = 0.0d;
@@ -293,7 +291,7 @@ public class WFSImage {
      */
     public BufferedImage draw(Tile tile,
                               Location location,
-                              FeatureCollection<SimpleFeatureType, SimpleFeature> features) {
+                              SimpleFeatureCollection features) {
         return draw(tile, location, null, features);
     }
 
@@ -310,7 +308,7 @@ public class WFSImage {
     public BufferedImage draw(Tile tile,
                               Location location,
                               List<Double> bounds,
-                              FeatureCollection<SimpleFeatureType, SimpleFeature> features) {
+                              SimpleFeatureCollection features) {
 
         this.imageWidth = tile.getWidth();
         this.imageHeight = tile.getHeight();

@@ -10,9 +10,8 @@ import fi.nls.oskari.wfs.WFSExceptionHelper;
 import fi.nls.oskari.wfs.WFSImage;
 import fi.nls.oskari.wfs.pojo.WFSLayerStore;
 import fi.nls.oskari.worker.AbstractJob;
-import org.geotools.feature.FeatureCollection;
-import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
+
+import org.geotools.data.simple.SimpleFeatureCollection;
 import org.opengis.referencing.operation.MathTransform;
 
 import java.awt.image.BufferedImage;
@@ -89,7 +88,7 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
     protected MathTransform transformService;
     protected MathTransform transformClient;
     protected JobType type;
-    protected FeatureCollection<SimpleFeatureType, SimpleFeature> features;
+    protected SimpleFeatureCollection features;
     protected List<String> processedFIDs = new ArrayList<String>();
     protected List<List<Object>> featureValuesList;
     protected List<List<Object>> geomValuesList;
@@ -465,14 +464,7 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
      * @return <code>true</code> if thread should continue; <code>false</code>
      *         otherwise.
      */
-    /**
-     * Makes request and parses response to features
-     * 
-     * @param bounds
-     * @return <code>true</code> if thread should continue; <code>false</code>
-     *         otherwise.
-     */
-    protected abstract boolean requestHandler(List<Double> bounds) ;
+    protected abstract boolean requestHandler(List<Double> bounds);
 
     /**
      * Parses features properties and sends to appropriate channels
@@ -719,13 +711,16 @@ public abstract class OWSMapLayerJob extends AbstractJob<String> {
         log.debug("Sending", geometries.size(), "geometries");
         this.service.addResults(this.session.getClient(), channel, output);
     }
-    public abstract RequestResponse request(JobType type, WFSLayerStore layer,
+    /*
+    public abstract Reader request(JobType type, WFSLayerStore layer,
                                             SessionStore session, List<Double> bounds,
                                             MathTransform transformService);
 
 
-    public abstract FeatureCollection<SimpleFeatureType, SimpleFeature> response(
-            WFSLayerStore layer, RequestResponse response);
+    public abstract FeatureCollection<SimpleFeatureType, SimpleFeature> response(JobType type, WFSLayerStore layer,
+            SessionStore session, List<Double> bounds,
+            MathTransform transformService);
+            */
 
     /**
      * Gets image from cache
