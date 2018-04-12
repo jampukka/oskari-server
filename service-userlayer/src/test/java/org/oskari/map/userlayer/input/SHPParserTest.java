@@ -17,6 +17,7 @@ import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.oskari.map.userlayer.service.UserLayerDataService;
 
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.CoordinateSequence;
@@ -75,13 +76,36 @@ public class SHPParserTest {
     public void testParseToDifferentProjecion() throws ServiceException, URISyntaxException, NoSuchAuthorityCodeException, FactoryException {
         File file = new File(SHPParserTest.class.getResource("SHP2017.shp").toURI());
         SHPParser parser = new SHPParser();
-        SimpleFeatureCollection fc = parser.parse(file, null, CRS.decode("EPSG:4326"));
+        SimpleFeatureCollection fc = parser.parse(file, null, CRS.decode("EPSG:4326", true));
         ReferencedEnvelope bounds = fc.getBounds();
         CoordinateReferenceSystem crs = bounds.getCoordinateReferenceSystem();
         assertEquals("Bounds is transformed correctly", "EPSG:4326", CRS.toSRS(crs));
-        assertEquals(59.80841, bounds.getMinX(), 1e-5);
-        assertEquals(19.47275, bounds.getMinY(), 1e-5);
-        assertEquals(70.09210, bounds.getMaxX(), 1e-5);
-        assertEquals(31.58671, bounds.getMaxY(), 1e-5);
+        assertEquals(19.47275, bounds.getMinX(), 1e-5);
+        assertEquals(59.80841, bounds.getMinY(), 1e-5);
+        assertEquals(31.58671, bounds.getMaxX(), 1e-5);
+        assertEquals(70.09210, bounds.getMaxY(), 1e-5);
     }
+
+    @Test
+    public void testParseToDifferentProjecionGKtoETRS35FIN() throws ServiceException, URISyntaxException, NoSuchAuthorityCodeException, FactoryException {
+        File file = new File(SHPParserTest.class.getResource("Seutukartta_maankaytto_jarvetPolygon.shp").toURI());
+        SHPParser parser = new SHPParser();
+        SimpleFeatureCollection fc = parser.parse(file, null, CRS.decode("EPSG:3067"));
+        ReferencedEnvelope bounds = fc.getBounds();
+        CoordinateReferenceSystem crs = bounds.getCoordinateReferenceSystem();
+        assertEquals("Bounds is transformed correctly", "EPSG:3067", CRS.toSRS(crs));
+        assertEquals(350037, bounds.getMinX(), 0.5);
+        assertEquals(6669374, bounds.getMinY(), 0.5);
+        assertEquals(398694, bounds.getMaxX(), 0.5);
+        assertEquals(6693429, bounds.getMaxY(), 0.5);
+
+        ReferencedEnvelope extentWGS84 = UserLayerDataService.transformExtentToWGS84(fc);
+        CoordinateReferenceSystem wgs84 = extentWGS84.getCoordinateReferenceSystem();
+        assertEquals("Bounds is transformed correctly", "EPSG:4326", CRS.toSRS(wgs84));
+        assertEquals(24.282180, extentWGS84.getMinX(), 1e-5);
+        assertEquals(60.133769, extentWGS84.getMinY(), 1e-5);
+        assertEquals(25.175397, extentWGS84.getMaxX(), 1e-5);
+        assertEquals(60.364604, extentWGS84.getMaxY(), 1e-5);
+    }
+
 }

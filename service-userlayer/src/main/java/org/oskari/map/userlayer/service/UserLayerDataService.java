@@ -64,13 +64,22 @@ public class UserLayerDataService {
     }
 
     private static String getWGS84ExtentAsWKT(SimpleFeatureCollection fc) {
-        try {
-            CoordinateReferenceSystem wgs84 = CRS.decode("EPSG:4326", true);
-            ReferencedEnvelope extentWGS84 = fc.getBounds().transform(wgs84, true);
-            return WKTHelper.getBBOX(extentWGS84.getMinX(),
+        ReferencedEnvelope extentWGS84 = transformExtentToWGS84(fc);
+        return WKTHelper.getBBOX(extentWGS84.getMinX(),
                     extentWGS84.getMinY(),
                     extentWGS84.getMaxX(),
                     extentWGS84.getMaxY());
+    }
+
+    public static ReferencedEnvelope transformExtentToWGS84(SimpleFeatureCollection fc) {
+        try {
+            ReferencedEnvelope extent = fc.getBounds();
+            CoordinateReferenceSystem sourceCRS = extent.getCoordinateReferenceSystem();
+            CoordinateReferenceSystem wgs84 = CRS.decode("EPSG:4326", true);
+            ReferencedEnvelope extentWGS84 = extent.transform(wgs84, true);
+            log.debug("Transformed extent:", extent, "to:", extentWGS84,
+                    "- sourceCRS", CRS.toSRS(sourceCRS), "targetCRS", CRS.toSRS(wgs84));
+            return extentWGS84;
         } catch (FactoryException | TransformException e) {
             // This shouldn't really happen since EPSG:4326 shouldn't be problematic
             // and transforming into it should always work. But if it does happen

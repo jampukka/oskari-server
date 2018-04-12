@@ -88,10 +88,10 @@ public class CreateUserLayerHandler extends ActionHandler {
     private static final int MAX_SIZE_MEMORY = 128 * KB;
 
     private final DiskFileItemFactory diskFileItemFactory = new DiskFileItemFactory(MAX_SIZE_MEMORY, null);
-    private final String targetEPSG = PropertyUtil.get(PROPERTY_TARGET_EPSG, "EPSG:4326");
     private final int userlayerMaxFileSize = PropertyUtil.getOptional(PROPERTY_USERLAYER_MAX_FILE_SIZE_MB, 10) * MB;
 
     private UserLayerDbService userLayerService;
+    private CoordinateReferenceSystem targetCRS;
 
     public void setUserLayerService(UserLayerDbService userLayerService) {
         this.userLayerService = userLayerService;
@@ -102,15 +102,44 @@ public class CreateUserLayerHandler extends ActionHandler {
         if (userLayerService == null) {
             userLayerService = new UserLayerDbServiceMybatisImpl();
         }
+        targetCRS = getTargetCRS();
+    }
+
+    private CoordinateReferenceSystem getTargetCRS() {
+        if (targetCRS == null) {
+            String targetSRS = PropertyUtil.get(PROPERTY_TARGET_EPSG);
+            if (targetSRS != null && !targetSRS.isEmpty()) {
+                try {
+                    targetCRS = CRS.decode(targetSRS);
+                } catch (Exception e) {
+                    log.warn(e, "Failed to decode CRS from: " + targetSRS);
+                }
+            }
+            if (targetCRS == null) {
+                // User WGS84 lon,lat as the default value
+                try {
+                    targetCRS = CRS.decode("EPSG:4326", true);
+                } catch (Exception e) {
+                    log.warn(e, "Failed to decode WGS84 CRS");
+                }
+            }
+        }
+        return targetCRS;
     }
 
     @Override
     public void handleAction(ActionParameters params) throws ActionException {
         params.requireLoggedInUser();
+        CoordinateReferenceSystem targetCRS = getTargetCRS();
+        if (targetCRS == null) {
+            // This shouldn't really happen since we have EPSG:4326 as the fallback
+            // but better safe than sorry
+            throw new ActionException("Service not setup correctly,"
+                    + " target coordinate reference system can not be found!");
+        }
 
         String sourceEPSG = params.getHttpParam(PARAM_SOURCE_EPSG_KEY);
         CoordinateReferenceSystem sourceCRS = decodeCRS(sourceEPSG);
-        CoordinateReferenceSystem targetCRS = decodeCRS(targetEPSG);
 
         List<FileItem> fileItems = getFileItems(params.getRequest());
         SimpleFeatureCollection fc;
