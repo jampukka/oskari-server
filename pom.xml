@@ -1165,6 +1165,7 @@
 
         <module>control-userlayer</module>
         <module>service-userlayer</module>
+        <module>cli-heightmap-tiles</module>
     </modules>
 
 </project>
