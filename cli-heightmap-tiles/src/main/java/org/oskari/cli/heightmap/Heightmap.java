@@ -31,12 +31,6 @@ public class Heightmap {
         extent = parseDoubleArray(args[3]);
         maxZoom = Integer.parseInt(args[4]);
 
-        /*
-        endPoint = "https://beta-karttakuva.maanmittauslaitos.fi/wcs/service/ows";
-        coverageId = "korkeusmalli__korkeusmalli";
-        baseDir = "C:/Omat/hmap";
-         */
-
         Capabilities caps = getCapabilities(endPoint);
         CoverageDescription tmp = describeCoverage(endPoint, coverageId);
         if (!(tmp instanceof RectifiedGridCoverage)) {
