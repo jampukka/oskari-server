@@ -38,8 +38,8 @@
 		</dependency>
 
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
+            <groupId>fi.nls.oskari</groupId>
+            <artifactId>shared-test-resources</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

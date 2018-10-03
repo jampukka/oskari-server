@@ -69,7 +69,7 @@ public class MetadataCatalogueChannelSearchService extends SearchChannel {
     private MetadataCatalogueResultParser RESULT_PARSER = null;
     private final MetadataCatalogueQueryHelper QUERY_HELPER = new MetadataCatalogueQueryHelper();
 
-    private OskariLayerService mapLayerService = OskariComponentManager.getComponentOfType(OskariLayerService.class);
+    private OskariLayerService mapLayerService;
 
     private static final String PROPERTY_IMAGE_PREFIX = "search.channel.METADATA_CATALOGUE_CHANNEL.image.url.";
     private static final String PROPERTY_FETCHURL_PREFIX = "search.channel.METADATA_CATALOGUE_CHANNEL.fetchpage.url.";
@@ -91,6 +91,10 @@ public class MetadataCatalogueChannelSearchService extends SearchChannel {
             fetchPageURLs.put(langCode, PropertyUtil.get(key));
         }
 
+        if (mapLayerService == null) {
+            mapLayerService = OskariComponentManager.getComponentOfType(OskariLayerService.class);
+        }
+
         // hook for customized parsing
         final String customResultParser = PropertyUtil.getOptional(PROPERTY_RESULTPARSER);
         if(customResultParser != null) {
@@ -104,6 +108,10 @@ public class MetadataCatalogueChannelSearchService extends SearchChannel {
         if(RESULT_PARSER == null) {
             RESULT_PARSER = new MetadataCatalogueResultParser();
         }
+    }
+
+    public void setMapLayerService(OskariLayerService mapLayerService) {
+        this.mapLayerService = mapLayerService;
     }
 
     /**

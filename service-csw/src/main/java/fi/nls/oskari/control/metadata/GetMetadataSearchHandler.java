@@ -33,44 +33,54 @@ import static fi.nls.oskari.control.ActionConstants.*;
 public class GetMetadataSearchHandler extends RestActionHandler {
 
     private static final Logger log = LogFactory.getLogger(GetMetadataSearchHandler.class);
-    private static final SearchService service = OskariComponentManager.getComponentOfType(SearchService.class);
 
-    private static final String PARAM_USER_INPUT = "search";
-
+    private static final String PARAM_SEARCH = "search";
     private static final String KEY_RESULTS = "results";
+
+    private SearchService service;
+
+    @Override
+    public void init() {
+        if (service == null) {
+            service = OskariComponentManager.getComponentOfType(SearchService.class);
+        }
+    }
+
+    public void setSearchService(SearchService service) {
+        this.service = service;
+    }
 
     @Override
     public void handlePost(ActionParameters params) throws ActionException {
-
         final SearchCriteria sc = new SearchCriteria();
-        final String language = params.getLocale().getLanguage();
-        sc.setLocale(language);
+
+        sc.setSearchString(params.getHttpParam(PARAM_SEARCH));
         sc.setSRS(params.getHttpParam(PARAM_SRS));
-        for(MetadataField field : MetadataCatalogueChannelSearchService.getFields()) {
+        sc.setLocale(params.getLocale().getLanguage());
+        for (MetadataField field : MetadataCatalogueChannelSearchService.getFields()) {
             field.getHandler().handleParam(params.getHttpParam(field.getName()), sc);
         }
 
-        final String userInput = params.getHttpParam(PARAM_USER_INPUT);
-        sc.setSearchString(userInput);
-
-        sc.addChannel(MetadataCatalogueChannelSearchService.ID);
         // validate will throw exception if we can't make the query
         validateRequest(sc);
-        // root object
-        final JSONObject result = new JSONObject();
-        final JSONArray results = new JSONArray();
-        final Query query = service.doSearch(sc);
-        final ChannelSearchResult searchResult = query.findResult(MetadataCatalogueChannelSearchService.ID);
 
-        log.debug("done search... now creating json objects");
+        ChannelSearchResult searchResult = search(sc);
+        JSONObject responseJSON = toJSON(searchResult);
+        ResponseHelper.writeResponse(params, responseJSON);
+    }
 
-        for(SearchResultItem item : searchResult.getSearchResultItems()) {
+    protected ChannelSearchResult search(SearchCriteria sc) {
+        sc.addChannel(MetadataCatalogueChannelSearchService.ID);
+        Query query = service.doSearch(sc);
+        return query.findResult(MetadataCatalogueChannelSearchService.ID);
+    }
+
+    private JSONObject toJSON(ChannelSearchResult searchResult) {
+        JSONArray results = new JSONArray();
+        for (SearchResultItem item : searchResult.getSearchResultItems()) {
             results.put(item.toJSON());
         }
-
-        // write response
-        JSONHelper.putValue(result, KEY_RESULTS, results);
-        ResponseHelper.writeResponse(params, result);
+        return JSONHelper.createJSONObject(KEY_RESULTS, results);
     }
 
     private void validateRequest(final SearchCriteria sc) throws ActionParamsException {
