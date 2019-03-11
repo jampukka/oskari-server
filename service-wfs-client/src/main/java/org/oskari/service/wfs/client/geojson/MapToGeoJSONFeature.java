@@ -10,6 +10,9 @@ import org.opengis.feature.simple.SimpleFeatureType;
 
 import com.vividsolutions.jts.geom.Geometry;
 
+import fi.nls.oskari.log.LogFactory;
+import fi.nls.oskari.log.Logger;
+
 /**
  * Utility class for converting a Map<String, Object> presentation
  * of a GeoJSON Feature to a SimpleFeature.
@@ -18,6 +21,8 @@ import com.vividsolutions.jts.geom.Geometry;
  * is rather specific. You really shouldn't be using this class in any other context.
  */
 class MapToGeoJSONFeature {
+
+    private static final Logger LOG = LogFactory.getLogger(MapToGeoJSONFeature.class);
 
     /**
      * Tries to convert a Map<String, Object> presentation of a GeoJSON
@@ -59,7 +64,7 @@ class MapToGeoJSONFeature {
 
             return buildFeature(id, geometry, properties);
         } catch (Exception ignore) {
-            ignore.printStackTrace();
+            LOG.debug(ignore, "Could not convert map to SimpleFeature");
             // Something failed, probably a NPE somewhere along the way
             // But we don't really care _why_ it wasn't a proper GeoJSON geometry
             // the fact that it wasn't is good enough for us
