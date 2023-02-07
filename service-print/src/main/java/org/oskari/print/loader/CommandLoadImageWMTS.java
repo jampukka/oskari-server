@@ -8,6 +8,10 @@ import java.util.Set;
 import java.util.concurrent.Future;
 
 import fi.nls.oskari.domain.map.OskariLayer;
+import org.geotools.referencing.CRS;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.NoSuchAuthorityCodeException;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.oskari.capabilities.CapabilitiesService;
 import org.oskari.capabilities.ogc.LayerCapabilitiesWMTS;
 import org.oskari.capabilities.ogc.wmts.*;
@@ -76,6 +80,10 @@ public class CommandLoadImageWMTS extends CommandLoadImageBase {
         double[] topLeft = tm.getTopLeftCorner();
         double minX = topLeft[0];
         double maxY = topLeft[1];
+        if (isAxisOrderNE(srs)) {
+            minX = topLeft[1];
+            maxY = topLeft[0];
+        }
 
         // Round to the nearest px
         long minXPx = Math.round((bbox[0] - minX) / resolution);
@@ -165,6 +173,11 @@ public class CommandLoadImageWMTS extends CommandLoadImageBase {
 
         g2d.dispose();
         return bi;
+    }
+
+    private boolean isAxisOrderNE(String srs) throws NoSuchAuthorityCodeException, FactoryException {
+        CoordinateReferenceSystem crs = CRS.decode(srs);
+        return CRS.getAxisOrder(crs) == CRS.AxisOrder.NORTH_EAST;
     }
 
     private LayerCapabilitiesWMTS getLayerCapabilities() throws IllegalArgumentException {
