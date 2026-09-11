@@ -110,6 +110,11 @@ public class GetAppSetupHandlerTest extends JSONActionRouteTest {
         handler.init();
     }
     @AfterEach
+    public void clearTelemetryProperty() throws Exception {
+        PropertyUtil.addProperty("actionhandler.GetAppSetup.telemetry", "false", true);
+    }
+
+    @AfterEach
     public void teardownMockedContructors() {
         if (oskariLayerServiceMybatisMockedConstruction != null) {
             oskariLayerServiceMybatisMockedConstruction.close();
@@ -317,4 +322,42 @@ public class GetAppSetupHandlerTest extends JSONActionRouteTest {
         dataProviderServiceMybatisMockedConstruction = Mockito.mockConstruction(DataProviderServiceMybatisImpl.class);
     }
 
+    @Test
+    public void testTelemetryNotWrittenByDefault() throws Exception {
+        final ActionParameters params = createActionParams();
+        handler.handleAction(params);
+
+        verify(params.getRequest(), never()).setAttribute(eq(GetAppSetupHandler.ATTR_EVENT), any());
+    }
+
+    @Test
+    public void testTelemetryForViewThatIsNotPublished() throws Exception {
+        PropertyUtil.addProperty("actionhandler.GetAppSetup.telemetry", "true", true);
+        // the property is read in init()
+        handler.init();
+
+        final ActionParameters params = createActionParams();
+        handler.handleAction(params);
+
+        // the mocked view is of type USER
+        verify(params.getRequest(), times(1))
+                .setAttribute(GetAppSetupHandler.ATTR_EVENT, "appsetup/user/aaaa-bbbbb-cccc");
+    }
+
+    @Test
+    public void testTelemetryForPublishedView() throws Exception {
+        PropertyUtil.addProperty("actionhandler.GetAppSetup.telemetry", "true", true);
+        handler.init();
+
+        final View published = ViewTestHelper.createMockView("framework.mapfull");
+        published.setType(ViewTypes.PUBLISHED);
+        published.setPubDomain("");
+        Mockito.lenient().doReturn(published).when(viewService).getViewWithConf(anyLong());
+
+        final ActionParameters params = createActionParams();
+        handler.handleAction(params);
+
+        verify(params.getRequest(), times(1))
+                .setAttribute(GetAppSetupHandler.ATTR_EVENT, "appsetup/published/aaaa-bbbbb-cccc");
+    }
 }

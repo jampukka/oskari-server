@@ -46,6 +46,12 @@ public class GetAppSetupHandler extends ActionHandler {
 
     public static final String COOKIE_SAVED_STATE = "oskaristate";
 
+    // Opt-in telemetry for the HTTP layer, "appsetup/<type>/<uuid>"
+    protected static final String ATTR_EVENT = "org.oskari.event";
+    private static final String PROPERTY_TELEMETRY = "actionhandler.GetAppSetup.telemetry";
+
+    private boolean writeTelemetry = false;
+
     // for adding extra bundle(s) for users with specific roles
     private Map<String, List<Bundle>> bundlesForRole = new HashMap<String, List<Bundle>>();
 
@@ -61,6 +67,7 @@ public class GetAppSetupHandler extends ActionHandler {
     }
 
     public void init() {
+        writeTelemetry = PropertyUtil.getOptional(PROPERTY_TELEMETRY, false);
         // setup services if they haven't been initialized
         if(viewService == null) {
             setViewService(new AppSetupServiceMybatisImpl());
@@ -256,6 +263,10 @@ public class GetAppSetupHandler extends ActionHandler {
             }
         }
 
+        if (writeTelemetry) {
+            params.getRequest().setAttribute(ATTR_EVENT, getEvent(view));
+        }
+
         // write response
         try {
             JSONObject appSetup = new JSONObject();
@@ -266,6 +277,18 @@ public class GetAppSetupHandler extends ActionHandler {
         } catch (JSONException jsonex) {
             throw new ActionException("Malformed startup sequence/config!", jsonex);
         }
+    }
+
+
+    private String getEvent(final View view) {
+        final StringBuilder event = new StringBuilder("appsetup");
+        if (view.getType() != null) {
+            event.append('/').append(view.getType().toLowerCase(Locale.ROOT));
+        }
+        if (view.getUuid() != null) {
+            event.append('/').append(view.getUuid());
+        }
+        return event.toString();
     }
 
     /**
